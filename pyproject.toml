@@ -72,7 +72,16 @@ ignore = [
 "tests/unit/test_anthropic_backend.py" = ["E402"]
 
 [tool.mypy]
-python_version = "3.11"
+# Not a floor on runtime support (that's [project].requires-python, ">=3.11",
+# enforced for real by every matrix Python actually running pytest) -- this
+# only controls the syntax dialect mypy parses, including third-party .pyi
+# stubs. numpy's own bundled stub (as resolved on Python 3.12/3.13 runners)
+# uses a PEP 695 `type` statement unconditionally, which mypy can only parse
+# at python_version >= "3.12"; pinning "3.11" here made mypy fail to even
+# read that file on those runners, before checking a single line of our own
+# code. A stale 3.12-only-syntax accident in OUR source would still be
+# caught for real by the 3.11 pytest job's actual interpreter.
+python_version = "3.12"
 files = [
   "src/palimpsest/__init__.py",
   "src/palimpsest/cli.py",
