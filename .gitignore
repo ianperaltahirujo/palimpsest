@@ -1,0 +1,48 @@
+# --- Confidential / private user data -------------------------------------
+# Anything under private/ is a per-user document map, entity roster, or
+# glossary override. It must never be committed. Two independent excludes
+# on purpose: this one, and private/.gitignore itself (written by
+# `palimpsest config init`).
+private/
+*.private.toml
+
+# Runtime state: OCR intermediates, translation cache, run reports.
+# The cache is the most valuable and most confidential artifact this tool
+# produces -- it is a parallel corpus of the user's real documents.
+.palimpsest/
+
+# Working corpora (user's own source/output documents)
+corpus/
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+!examples/**/*.pdf
+!examples/**/*.docx
+!examples/**/*.xlsx
+!examples/**/*.pptx
+
+# --- Python ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# --- Secrets -------------------------------------------------------------
+.env
+*.key
+
+# --- Editor / OS ---------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

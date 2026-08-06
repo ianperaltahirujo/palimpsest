@@ -1,0 +1,14 @@
+palimpsest
+Copyright 2026 Ian Peralta
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+Design inspiration
+-------------------
+Several architectural ideas in this project -- most notably TOML-based
+project configuration and bilingual (side-by-side) PDF output -- were
+inspired by BabelDOC (https://github.com/funstory-ai/BabelDOC), an
+AGPL-3.0-licensed scientific-PDF translation tool. No BabelDOC source code
+is included in or derived into this project; this is an acknowledgement of
+design influence, not a statement of shared code or license terms.
