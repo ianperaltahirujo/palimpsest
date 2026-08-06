@@ -1,0 +1,41 @@
+# Entities that must survive translation verbatim: company names, personal
+# names, place names, anything a machine translator would otherwise
+# "helpfully" render into English.
+#
+# This file is USER DATA -- copy it to the path named by [private].entities
+# in your palimpsest.toml (default: private/entities.toml) and fill in
+# your own corpus's names. Keep it out of version control: `palimpsest
+# config init` scaffolds private/ with a .gitignore that excludes
+# everything in it.
+#
+# Names below are a fictional cast, for illustration only.
+
+[entities]
+companies = [
+    "Grupo Meridian", "GRUPO MERIDIAN",
+    "Grupo Aurora, SRL.", "GRUPO AURORA",
+    "Grupo Peñasco", "GRUPO PENASCO",
+    "Banco Litoral",
+]
+people = [
+    "Andrés Carreño", "Andres Carreno",
+    "Alberto Núñez", "Alberto Nunez",
+]
+places = [
+    "Santo Domingo Este",
+    "Ciudad Juan Bosch",
+    "Avenida Ecológica", "AVENIDA ECOLOGICA",
+]
+other = [
+    # Statutes, agencies, species names -- anything else that must not be
+    # machine-translated.
+    "MICM", "DGII",
+]
+
+[options]
+# Accent-stripped and case-insensitive variants are generated automatically
+# from every entry above -- you don't need to list both spellings yourself.
+protect_numbers = true   # RD$/US$/$ amounts and bare digit runs
+fragment_guard = true    # a paragraph that is ONE word of a multi-word
+                          # entity (e.g. a lone "GRUPO") is almost always a
+                          # truncated OCR capture, not legitimate prose

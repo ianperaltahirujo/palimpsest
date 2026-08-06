@@ -1,0 +1,21 @@
+# Packaged defaults -- shipped with palimpsest itself, not project-specific.
+#
+# Only thresholds live here. Everything else (paths, backend choice,
+# glossary domains, private entity/document files) is corpus- and
+# deployment-specific and belongs in a project's own palimpsest.toml, never
+# in the package.
+#
+# These particular numbers are not universal constants -- most were fitted
+# against a specific real-world document corpus, and are documented as such
+# in docs/design/bold-calibration.md. Treat them as a reasonable starting
+# point, not ground truth for every corpus.
+
+[thresholds]
+min_text_size = 3.0
+min_text_size_scan = 7.0
+size_jitter_tolerance = 0.75
+bold_stem_ratio = 0.155
+ink_dark_threshold = 165
+min_scale = 0.72
+justify_max_stretch = 2.6
+label_max_chars = 90

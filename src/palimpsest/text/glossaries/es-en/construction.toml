@@ -1,0 +1,35 @@
+# Spanish -> English glossary: construction-budget / bill-of-quantities
+# terminology. Generic MT renders several of these with the wrong sense in
+# this context -- "Cantidad" comes back as "Amount" (a money word) when it
+# means "Quantity" on a line-item schedule.
+
+[terms]
+"Cantidad" = "Quantity"
+"Cantidades" = "Quantities"
+"Unidad" = "Unit"
+"Precio unitario" = "Unit price"
+"Presupuesto general" = "General budget"
+"Costos directos" = "Direct costs"
+"Costos indirectos" = "Indirect costs"
+"Cubicación" = "Progress measurement"
+"Cubicaciones" = "Progress measurements"
+"Partida" = "Line item"
+"Partidas" = "Line items"
+"Mano de obra" = "Labor"
+"Materiales" = "Materials"
+"Movimiento de tierra" = "Earthworks"
+"Hormigón" = "Concrete"
+"Acero" = "Steel"
+"Encofrado" = "Formwork"
+"Terminación" = "Finishing"
+"Terminaciones" = "Finishes"
+"Instalaciones eléctricas" = "Electrical installations"
+"Instalaciones sanitarias" = "Plumbing installations"
+"Locales comerciales" = "Commercial premises"
+"Avance" = "Progress"
+"Monto" = "Amount"
+"Tasa" = "Rate"
+"Cronograma" = "Schedule"
+"Cronograma de construcción" = "Construction schedule"
+"Flujo de caja" = "Cash flow"
+"Proyección" = "Projection"

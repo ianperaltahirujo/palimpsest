@@ -1,0 +1,95 @@
+# Example palimpsest project configuration. Copy this file to your project
+# root as `palimpsest.toml` and adjust. This file itself is safe to commit
+# -- it names no documents, companies, or people. The [private] section
+# below points at files that ARE meant to hold that kind of data, and
+# those stay out of version control (see `palimpsest config init`, which
+# scaffolds a private/ directory with its own .gitignore).
+#
+# All paths are resolved relative to the directory containing THIS file,
+# not the directory you happen to run `palimpsest` from.
+
+schema = 1
+
+[language]
+source = "es"
+target = "en"
+
+[paths]
+source_dir = "corpus/source"
+output_dir = "corpus/output"
+work_dir = ".palimpsest/work"     # OCR intermediates -- safe to delete
+cache_dir = ".palimpsest/cache"   # translation history -- worth keeping
+report_dir = ".palimpsest/reports"
+
+[private]
+# Absent or missing files are not an error: no entities, and documents are
+# named by mirroring their source-relative path under output_dir.
+entities = "private/entities.toml"
+documents = "private/documents.toml"
+
+[backend]
+name = "anthropic"      # "anthropic" | "google"
+fallback = "google"     # used if the primary backend errors or refuses
+
+[backend.anthropic]
+model = "claude-opus-5"
+effort = "low"
+batch_size = 25
+use_batches_api = false   # true for large corpus runs: ~50% cheaper, async
+max_retries = 5
+max_concurrency = 4
+# API key comes from $ANTHROPIC_API_KEY. Never put a key in this file.
+
+[backend.google]
+batch_size = 20
+pause_seconds = 0.35
+
+[glossary]
+# Bundled domains: run `palimpsest glossary list` to see what's available
+# (currently "legal", "ifrs", "construction" for the es-en pair). Domains
+# are complementary, not mutually exclusive -- pick the ones relevant to
+# what you're translating.
+domains = ["legal"]
+extra = []              # additional user-supplied glossary TOML files
+heading_numbers = true  # "2.26 Reconocimiento de ingresos" -> glossary hit
+
+[postrules]
+sets = ["dates"]
+extra = []
+
+[ocr]
+enabled = true
+language = "spa"
+tessdata_prefix = ""     # "" = auto-detect; set if your spa.traineddata
+                          # lives somewhere nonstandard
+oversample = 400
+mode = "skip-text"       # NOT "force-ocr" -- that rasterises every page
+                          # and can multiply file size on an already-clean
+                          # scan
+optimize = 1
+
+[thresholds]
+# These are corpus-fitted starting points, not universal constants -- see
+# docs/design/bold-calibration.md. Override here if your documents behave
+# differently.
+min_text_size = 3.0
+min_text_size_scan = 7.0
+size_jitter_tolerance = 0.75
+bold_stem_ratio = 0.155
+ink_dark_threshold = 165
+min_scale = 0.72
+justify_max_stretch = 2.6
+label_max_chars = 90
+
+[fonts]
+scan_default = "Calibri"   # OCR text layers name every span "GlyphLessFont",
+                             # so the family has to be chosen, not read
+use_bundled_fallback = true
+extra_dirs = []
+[fonts.per_document]
+# "Some Folder/deed.pdf" = "Georgia"
+
+# Note: there is no [copy_as_is] section here. Which directories/files get
+# copied through untranslated is corpus-specific -- as disclosive as the
+# document map itself -- so it lives in the private documents file (see
+# examples/documents.example.toml), not in this public project config.

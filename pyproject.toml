@@ -27,7 +27,6 @@ dependencies = [
   "lxml>=5.0",
   "numpy>=1.26",
   "pillow>=10.0",
-  "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
@@ -69,13 +68,13 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.11"
-# Grows to include src/palimpsest/config in PR3 and
-# translate/backend.py in PR5.
+# Grows to include translate/backend.py in PR5.
 files = [
   "src/palimpsest/__init__.py",
   "src/palimpsest/cli.py",
   "src/palimpsest/core",
   "src/palimpsest/text",
+  "src/palimpsest/config",
 ]
 ignore_missing_imports = true
 

@@ -1,0 +1,25 @@
+# Source-relative -> output-relative filename mapping. Optional: a
+# document not listed here is translated with its output path mirroring
+# its source-relative path under [paths].output_dir.
+#
+# Keys and values use forward slashes regardless of what OS you're on --
+# see palimpsest.core.paths.norm_rel, which normalizes both a literal
+# backslash (from a Windows-authored map) and NFC/NFD accent differences
+# (from a macOS-authored one) to the same canonical key.
+#
+# This file is USER DATA -- copy it to the path named by
+# [private].documents in your palimpsest.toml (default:
+# private/documents.toml) and keep it out of version control.
+
+[pdf]
+"Financial statements/Audited financials 2024.pdf" = "Financial statements/Audited Financial Statements 2024 (English).pdf"
+"Corporate/Trust deed.pdf" = "Corporate/Trust Deed (English).pdf"
+
+[office]
+"Budget/General budget.xlsx" = "Budget/General Budget (English).xlsx"
+
+[copy_as_is]
+# Left untranslated and copied through verbatim: engineering drawings,
+# CAD/analysis binaries, ID documents, huge reference portfolios.
+dirs = ["Drawings", "Project Photos"]
+files = ["Corporate/Passport scan.pdf"]
