@@ -1,0 +1,163 @@
+"""Builds a `Backend` from `Config.backend`, wiring the configured
+primary backend to an optional fallback.
+
+Why the fallback isn't just "try backend A, then backend B" at the
+`Translator` layer
+--------------------------------------------------------------------------
+The two backends disagree about *how* entity/number protection works
+(`Backend.uses_placeholder_protection` -- see `translate.backend`'s module
+docstring): Google needs the text placeholdered before the call, Claude
+needs it raw. If a fallback simply forwarded whatever text the primary
+backend was given, a Claude-primary/Google-fallback pair would hand
+Google raw Spanish with no protection on a fallback attempt -- exactly
+the class of bug (`GRUPO` -> `CLUSTER`) protection exists to prevent, for
+every fallback translation. `FallbackBackend` applies each sub-backend's
+OWN protection scheme on each attempt, and so declares
+`uses_placeholder_protection = False` to its caller: it always receives
+raw text and decides internally, per sub-backend, how to protect it.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from palimpsest.config.model import Config
+from palimpsest.core import paths as core_paths
+from palimpsest.core.errors import ConfigError
+from palimpsest.text.glossary import Glossary
+from palimpsest.text.protect import all_tokens_restored, build_protect_re, protect, restore
+from palimpsest.translate.backend import Backend, Cost, TranslationContext, TranslationResult
+from palimpsest.translate.cache import compute_namespace
+from palimpsest.translate.google import GoogleBackend
+from palimpsest.translate.translator import Translator
+
+_KNOWN = ("google", "anthropic")
+
+
+def _build_one(name: str, config: Config) -> Backend:
+    if name == "google":
+        g = config.backend.google
+        return GoogleBackend(max_batch=g.batch_size, retry_pause=g.pause_seconds)
+    if name == "anthropic":
+        from palimpsest.translate.anthropic import AnthropicBackend
+
+        return AnthropicBackend.from_config(config.backend.anthropic)
+    raise ConfigError(f"unknown backend {name!r} (expected one of {_KNOWN})")
+
+
+def make_backend(config: Config) -> Backend:
+    """The backend named by `[backend].name`, wrapped with the one named
+    by `[backend].fallback` if configured and different."""
+    primary = _build_one(config.backend.name, config)
+    fallback_name = config.backend.fallback
+    if not fallback_name or fallback_name == config.backend.name:
+        return primary
+    fallback = _build_one(fallback_name, config)
+    return FallbackBackend(primary, fallback)
+
+
+def build_translator(
+    rel: str,
+    config: Config,
+    backend: Backend,
+    entities: Sequence[str],
+    glossary: Glossary,
+    post_rules: Sequence[tuple[str, str]],
+) -> Translator:
+    """One `Translator` per document, matching the pipeline's per-document
+    cache file. `entities`/`glossary`/`post_rules` are what the resulting
+    cache namespace is computed from -- change any of them and a
+    document's cache moves to a fresh namespace rather than silently
+    serving stale output (see `translate.cache.compute_namespace`)."""
+    key = core_paths.cache_key(core_paths.norm_rel(rel))
+    cache_path = config.paths.cache_dir / f"{key}.json"
+    namespace = compute_namespace(
+        backend.name,
+        getattr(backend, "model", None),
+        config.language.source,
+        config.language.target,
+        glossary_terms=glossary.terms,
+        entities=entities,
+        post_rules=post_rules,
+    )
+    return Translator(
+        cache_path,
+        backend,
+        cache_namespace=namespace,
+        entities=entities,
+        glossary=glossary,
+        post_rules=post_rules,
+        source=config.language.source,
+        target=config.language.target,
+    )
+
+
+class FallbackBackend:
+    name_prefix = "fallback"
+    uses_placeholder_protection = False
+
+    def __init__(self, primary: Backend, fallback: Backend):
+        self.primary = primary
+        self.fallback = fallback
+        self.name = f"{primary.name}+fallback:{fallback.name}"
+        self.model = getattr(primary, "model", None)
+        self.prefers_batch = primary.prefers_batch
+        self.max_batch = min(primary.max_batch, fallback.max_batch)
+
+    def _call(self, backend: Backend, text: str, ctx: TranslationContext) -> TranslationResult:
+        if not backend.uses_placeholder_protection:
+            return backend.translate(text, ctx)
+        protect_re = build_protect_re(ctx.entities)
+        protected, tokens = protect(text, protect_re)
+        result = backend.translate(protected, ctx)
+        if result.status != "ok":
+            return result
+        restored = restore(result.text, tokens)
+        if restored is None or not all_tokens_restored(restored):
+            return TranslationResult(
+                text=None, status="failed", detail="placeholder not restored"
+            )
+        return TranslationResult(text=restored, status="ok")
+
+    def translate(self, text: str, ctx: TranslationContext) -> TranslationResult:
+        result = self._call(self.primary, text, ctx)
+        if result.status == "ok":
+            return result
+        return self._call(self.fallback, text, ctx)
+
+    def translate_batch(
+        self, texts: Sequence[str], ctx: TranslationContext
+    ) -> list[TranslationResult]:
+        """Batches through the primary only -- any non-"ok" result falls
+        through to `translate()`, the same "leave it for the accurate
+        single-string path" pattern `Translator.warm()` already uses for
+        an imperfect batch result, so the correct per-unit fallback logic
+        above lives in exactly one place."""
+        if not self.primary.uses_placeholder_protection:
+            primary_results = self.primary.translate_batch(list(texts), ctx)
+        else:
+            protect_re = build_protect_re(ctx.entities)
+            pairs = [protect(t, protect_re) for t in texts]
+            raw_results = self.primary.translate_batch([p[0] for p in pairs], ctx)
+            primary_results = []
+            for (_prot, tokens), result in zip(pairs, raw_results, strict=True):
+                if result.status != "ok":
+                    primary_results.append(result)
+                    continue
+                restored = restore(result.text, tokens)
+                if restored is None or not all_tokens_restored(restored):
+                    primary_results.append(
+                        TranslationResult(
+                            text=None, status="failed", detail="placeholder not restored"
+                        )
+                    )
+                else:
+                    primary_results.append(TranslationResult(text=restored, status="ok"))
+
+        return [
+            r if r.status == "ok" else self.translate(t, ctx)
+            for t, r in zip(texts, primary_results, strict=True)
+        ]
+
+    def estimate(self, texts: Sequence[str], ctx: TranslationContext) -> Cost | None:
+        return self.primary.estimate(texts, ctx)

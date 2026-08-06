@@ -73,6 +73,23 @@ class Para:
         "hang_x0", "starts_item",
     )
 
+    runs: list[dict]
+    rect: fitz.Rect
+    origin: tuple[float, float]
+    align: str
+    leading: float | None
+    size: float
+    font: str
+    color: tuple[float, float, float]
+    page: int
+    indent: float
+    line_rects: list[fitz.Rect]
+    text: str
+    block_no: int
+    clip: fitz.Rect | None
+    hang_x0: float | None
+    starts_item: bool
+
     def __init__(self, **kw):
         for k in self.__slots__:
             setattr(self, k, kw.get(k))

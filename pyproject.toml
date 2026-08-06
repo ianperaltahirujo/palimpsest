@@ -65,6 +65,7 @@ ignore = [
 # Fixture files carry literal OOXML/long descriptive strings that shouldn't
 # be wrapped -- wrapping would either break the XML or hurt readability.
 "tests/unit/test_ooxml.py" = ["E501"]
+"tests/unit/test_office_pipeline.py" = ["E501"]
 # pytest.importorskip("anthropic") must run before importing anything that
 # transitively imports the anthropic package, so the module-level imports
 # below it are deliberate, not an ordering mistake.
@@ -75,11 +76,16 @@ python_version = "3.11"
 files = [
   "src/palimpsest/__init__.py",
   "src/palimpsest/cli.py",
+  "src/palimpsest/corpus.py",
   "src/palimpsest/core",
   "src/palimpsest/text",
   "src/palimpsest/config",
   "src/palimpsest/translate",
   "src/palimpsest/qa",
+  "src/palimpsest/pdf/classify.py",
+  "src/palimpsest/pdf/ocr.py",
+  "src/palimpsest/pdf/pipeline.py",
+  "src/palimpsest/office/pipeline.py",
 ]
 ignore_missing_imports = true
 

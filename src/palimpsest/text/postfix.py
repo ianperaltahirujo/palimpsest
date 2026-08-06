@@ -22,7 +22,9 @@ generically, because the failure is specific enough that a general
 from __future__ import annotations
 
 import re
+import tomllib
 from collections.abc import Iterable
+from pathlib import Path
 
 ZERO_WIDTH_RE = re.compile("[​‌‍﻿]")
 
@@ -62,3 +64,28 @@ def apply(text: str | None, rules: Iterable[tuple[str, str]]) -> str | None:
     for pattern, replacement in rules:
         text = re.sub(pattern, replacement, text)
     return text
+
+
+_SETS: dict[str, list[tuple[str, str]]] = {"dates": DATE_RULES}
+
+
+def available_sets() -> tuple[str, ...]:
+    return tuple(sorted(_SETS))
+
+
+def load(sets: Iterable[str] = (), extra: Iterable[Path] = ()) -> list[tuple[str, str]]:
+    """Assemble a post-rule list from packaged set names (`[postrules]
+    sets` in palimpsest.toml) plus user-supplied TOML files (`extra`),
+    each holding `[[rule]] pattern = "..." replacement = "..."` entries.
+    Order matters -- rules apply in the order given, sets before extra,
+    each internally in file order."""
+    rules: list[tuple[str, str]] = []
+    for name in sets:
+        if name not in _SETS:
+            raise ValueError(f"unknown post-rule set {name!r}; available: {available_sets()}")
+        rules.extend(_SETS[name])
+    for path in extra:
+        data = tomllib.loads(Path(path).read_text(encoding="utf-8"))
+        for entry in data.get("rule", []):
+            rules.append((entry["pattern"], entry["replacement"]))
+    return rules

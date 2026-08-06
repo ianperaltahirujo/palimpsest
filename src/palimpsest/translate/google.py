@@ -26,12 +26,12 @@ from palimpsest.translate.backend import Cost, TranslationContext, TranslationRe
 class GoogleBackend:
     name = "google"
     prefers_batch = False
-    max_batch = 20
     uses_placeholder_protection = True
 
-    def __init__(self, attempts: int = 3, retry_pause: float = 0.6):
+    def __init__(self, attempts: int = 3, retry_pause: float = 0.6, max_batch: int = 20):
         self.attempts = attempts
         self.retry_pause = retry_pause
+        self.max_batch = max_batch
         self._translators: dict[tuple[str, str], GoogleTranslator] = {}
 
     def _translator_for(self, ctx: TranslationContext) -> GoogleTranslator:

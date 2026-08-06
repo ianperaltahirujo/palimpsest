@@ -1,4 +1,4 @@
-from palimpsest.text.postfix import DATE_RULES, apply
+from palimpsest.text.postfix import DATE_RULES, apply, available_sets, load
 
 
 def test_dd_of_month_of_yyyy():
@@ -61,3 +61,44 @@ def test_none_passes_through():
 
 def test_apply_with_no_rules_is_identity_modulo_zero_width():
     assert apply("plain text", []) == "plain text"
+
+
+# -- load() -----------------------------------------------------------------
+
+def test_available_sets_includes_dates():
+    assert "dates" in available_sets()
+
+
+def test_load_dates_set_matches_date_rules():
+    assert load(sets=["dates"]) == DATE_RULES
+
+
+def test_load_unknown_set_raises():
+    import pytest
+
+    with pytest.raises(ValueError, match="unknown post-rule set"):
+        load(sets=["not-a-real-set"])
+
+
+def test_load_extra_toml_file(tmp_path):
+    path = tmp_path / "extra.toml"
+    path.write_text(
+        '[[rule]]\npattern = "foo"\nreplacement = "bar"\n', encoding="utf-8"
+    )
+    rules = load(sets=[], extra=[path])
+    assert rules == [("foo", "bar")]
+    assert apply("a foo b", rules) == "a bar b"
+
+
+def test_load_combines_sets_and_extra_in_order(tmp_path):
+    path = tmp_path / "extra.toml"
+    path.write_text(
+        '[[rule]]\npattern = "Domingo"\nreplacement = "REPLACED"\n', encoding="utf-8"
+    )
+    rules = load(sets=["dates"], extra=[path])
+    assert rules[: len(DATE_RULES)] == DATE_RULES
+    assert rules[-1] == ("Domingo", "REPLACED")
+
+
+def test_load_no_args_returns_empty():
+    assert load() == []
