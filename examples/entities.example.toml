@@ -32,10 +32,12 @@ other = [
     "MICM", "DGII",
 ]
 
-[options]
 # Accent-stripped and case-insensitive variants are generated automatically
-# from every entry above -- you don't need to list both spellings yourself.
-protect_numbers = true   # RD$/US$/$ amounts and bare digit runs
-fragment_guard = true    # a paragraph that is ONE word of a multi-word
-                          # entity (e.g. a lone "GRUPO") is almost always a
-                          # truncated OCR capture, not legitimate prose
+# from every entry above -- you don't need to list both spellings yourself
+# (the duplicate un-accented entries above are for readability, not need).
+#
+# No [options] section: number protection (RD$/US$/$ amounts, bare digit
+# runs) and the fragment guard (a paragraph that is ONE word of a
+# multi-word entity above -- e.g. a lone "GRUPO" -- is almost always a
+# truncated OCR capture, not legitimate prose, so it's treated as
+# protected too) are always on, not something you toggle here.
