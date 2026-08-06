@@ -42,11 +42,9 @@ all = ["palimpsest-translate[anthropic,ocr]"]
 [project.scripts]
 palimpsest = "palimpsest.cli:main"
 
-# [project.urls]
-# Filled in once the GitHub repo is created (gh repo create) -- not guessing
-# the account/org name here.
-# Homepage = "https://github.com/<owner>/palimpsest"
-# Issues = "https://github.com/<owner>/palimpsest/issues"
+[project.urls]
+Homepage = "https://github.com/ianperaltahirujo/palimpsest"
+Issues = "https://github.com/ianperaltahirujo/palimpsest/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/palimpsest"]
