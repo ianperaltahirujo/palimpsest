@@ -65,6 +65,10 @@ ignore = [
 # Fixture files carry literal OOXML/long descriptive strings that shouldn't
 # be wrapped -- wrapping would either break the XML or hurt readability.
 "tests/unit/test_ooxml.py" = ["E501"]
+# pytest.importorskip("anthropic") must run before importing anything that
+# transitively imports the anthropic package, so the module-level imports
+# below it are deliberate, not an ordering mistake.
+"tests/unit/test_anthropic_backend.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"
