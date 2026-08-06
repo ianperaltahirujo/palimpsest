@@ -58,13 +58,25 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+ignore = [
+  "UP031",  # "{%s}tag" % NS Clark-notation is idiomatic in lxml/ElementTree code
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Fixture files carry literal OOXML/long descriptive strings that shouldn't
+# be wrapped -- wrapping would either break the XML or hurt readability.
+"tests/unit/test_ooxml.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"
-# Grows to include src/palimpsest/{text,config} in PR2-3 and
-# translate/backend.py in PR5. Kept to the package root for now so CI has
-# something real to check without referencing modules that don't exist yet.
-files = ["src/palimpsest/__init__.py", "src/palimpsest/cli.py"]
+# Grows to include src/palimpsest/config in PR3 and
+# translate/backend.py in PR5.
+files = [
+  "src/palimpsest/__init__.py",
+  "src/palimpsest/cli.py",
+  "src/palimpsest/core",
+  "src/palimpsest/text",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

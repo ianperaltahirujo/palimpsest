@@ -89,7 +89,12 @@ def iter_tracked_files() -> list[Path]:
             ["git", "ls-files"],
             cwd=REPO_ROOT,
             capture_output=True,
-            text=True,
+            # Explicit encoding, not text=True: on Windows text=True decodes
+            # with the console codepage (cp1252), which raises on the
+            # accented characters this language pair is full of. Same class
+            # of bug documented throughout this project's own history.
+            encoding="utf-8",
+            errors="replace",
             check=True,
         ).stdout
         return [REPO_ROOT / line for line in out.splitlines() if line.strip()]
@@ -103,7 +108,9 @@ def iter_tracked_files() -> list[Path]:
         return files
 
 
-def scan_text(label: str, text: str, denylist: list[str]) -> list[tuple[str, str]]:
+def scan_text(label: str, text: str | None, denylist: list[str]) -> list[tuple[str, str]]:
+    if not text:
+        return []
     hits = []
     normalized = normalize(text)
     for term in denylist:
@@ -131,10 +138,18 @@ def scan_working_tree(denylist: list[str]) -> list[tuple[str, str]]:
 def scan_history(denylist: list[str]) -> list[tuple[str, str]]:
     try:
         out = subprocess.run(
-            ["git", "log", "-p", "--all"],
+            # This file's own diffs are excluded: the GENERIC_DENYLIST
+            # literal above necessarily contains every one of its own
+            # terms, so scanning this file's history against itself is
+            # pure self-reference noise, not a leak.
+            [
+                "git", "log", "-p", "--all", "--", ".",
+                f":(exclude){Path(__file__).resolve().relative_to(REPO_ROOT).as_posix()}",
+            ],
             cwd=REPO_ROOT,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
         ).stdout
     except (subprocess.CalledProcessError, FileNotFoundError):
