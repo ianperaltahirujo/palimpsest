@@ -68,13 +68,14 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.11"
-# Grows to include translate/backend.py in PR5.
 files = [
   "src/palimpsest/__init__.py",
   "src/palimpsest/cli.py",
   "src/palimpsest/core",
   "src/palimpsest/text",
   "src/palimpsest/config",
+  "src/palimpsest/translate",
+  "src/palimpsest/qa",
 ]
 ignore_missing_imports = true
 
