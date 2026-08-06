@@ -77,13 +77,15 @@ de ingresos"` and the number is re-attached to the result.
 
 ## Backends
 
-`[backend].name` selects the primary translation backend (`"anthropic"`
-or `"google"`); `[backend].fallback` is used if the primary errors or
-refuses. The Anthropic backend needs `$ANTHROPIC_API_KEY` in your
-environment — never put an API key in `palimpsest.toml`. See
-[`docs/design/backends.md`](design/backends.md) (added alongside the
-Anthropic backend) for the pricing/model tradeoffs and how prompt caching
-and the Batches API affect cost on a large corpus run.
+`[backend].name` selects the primary translation backend (`"gemini"`,
+`"anthropic"`, or `"google"`); `[backend].fallback` is used if the primary
+errors or refuses. `"gemini"` is the default — it needs `$GEMINI_API_KEY`
+(or `$GOOGLE_API_KEY`) in your environment, a free key from Google AI
+Studio. The Anthropic backend needs `$ANTHROPIC_API_KEY`. Never put an API
+key in `palimpsest.toml`. See [`docs/design/backends.md`](design/backends.md)
+for the pricing/model tradeoffs, why Gemini is the default despite Claude
+being the stronger model, and how prompt caching and the Batches API
+affect cost on a large corpus run.
 
 ## Thresholds
 

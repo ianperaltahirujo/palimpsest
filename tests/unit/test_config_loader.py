@@ -62,10 +62,11 @@ def test_absolute_path_is_not_rebased(tmp_path):
     assert config.paths.work_dir == abs_dir
 
 
-def test_backend_anthropic_defaults():
+def test_backend_defaults():
     config = loader.load(None)
-    assert config.backend.name == "anthropic"
-    assert config.backend.fallback == "google"
+    assert config.backend.name == "gemini"
+    assert config.backend.fallback == "anthropic"
+    assert config.backend.gemini.model == "gemini-3.5-flash-lite"
     assert config.backend.anthropic.model == "claude-opus-5"
 
 
@@ -77,6 +78,14 @@ def test_backend_override_preserves_unset_fields(tmp_path):
     config = loader.load(cfg)
     assert config.backend.anthropic.model == "claude-sonnet-5"
     assert config.backend.anthropic.batch_size == 25  # untouched default
+
+
+def test_backend_gemini_override_preserves_unset_fields(tmp_path):
+    cfg = tmp_path / "palimpsest.toml"
+    cfg.write_text('[backend.gemini]\nmodel = "gemini-3.6-flash"\n', encoding="utf-8")
+    config = loader.load(cfg)
+    assert config.backend.gemini.model == "gemini-3.6-flash"
+    assert config.backend.gemini.batch_size == 20  # untouched default
 
 
 # -- private entities / documents -------------------------------------

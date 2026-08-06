@@ -80,11 +80,19 @@ class GoogleBackendConfig:
 
 
 @dataclass(frozen=True)
+class GeminiBackendConfig:
+    model: str = "gemini-3.5-flash-lite"
+    batch_size: int = 20
+    max_output_tokens_per_unit: int = 4096
+
+
+@dataclass(frozen=True)
 class BackendConfig:
-    name: str = "anthropic"
-    fallback: str | None = "google"
+    name: str = "gemini"
+    fallback: str | None = "anthropic"
     anthropic: AnthropicBackendConfig = field(default_factory=AnthropicBackendConfig)
     google: GoogleBackendConfig = field(default_factory=GoogleBackendConfig)
+    gemini: GeminiBackendConfig = field(default_factory=GeminiBackendConfig)
 
 
 @dataclass(frozen=True)

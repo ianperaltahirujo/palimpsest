@@ -19,6 +19,7 @@ from palimpsest.config.model import (
     CopyAsIsConfig,
     DocumentMap,
     FontsConfig,
+    GeminiBackendConfig,
     GlossaryConfig,
     GoogleBackendConfig,
     LanguageConfig,
@@ -99,6 +100,7 @@ def load(config_path: Path | None) -> Config:
     backend = data.get("backend", {})
     backend_anthropic = backend.get("anthropic", {})
     backend_google = backend.get("google", {})
+    backend_gemini = backend.get("gemini", {})
     glossary = data.get("glossary", {})
     postrules = data.get("postrules", {})
     ocr = data.get("ocr", {})
@@ -108,6 +110,7 @@ def load(config_path: Path | None) -> Config:
     default_paths = PathsConfig()
     default_backend_a = AnthropicBackendConfig()
     default_backend_g = GoogleBackendConfig()
+    default_backend_gemini = GeminiBackendConfig()
     default_ocr = OcrConfig()
     default_thresholds = ThresholdsConfig()
     default_fonts = FontsConfig()
@@ -130,8 +133,8 @@ def load(config_path: Path | None) -> Config:
             documents=_resolve(base_dir, private.get("documents")),
         ),
         backend=BackendConfig(
-            name=backend.get("name", "anthropic"),
-            fallback=backend.get("fallback", "google"),
+            name=backend.get("name", "gemini"),
+            fallback=backend.get("fallback", "anthropic"),
             anthropic=AnthropicBackendConfig(
                 model=backend_anthropic.get("model", default_backend_a.model),
                 effort=backend_anthropic.get("effort", default_backend_a.effort),
@@ -147,6 +150,14 @@ def load(config_path: Path | None) -> Config:
             google=GoogleBackendConfig(
                 batch_size=backend_google.get("batch_size", default_backend_g.batch_size),
                 pause_seconds=backend_google.get("pause_seconds", default_backend_g.pause_seconds),
+            ),
+            gemini=GeminiBackendConfig(
+                model=backend_gemini.get("model", default_backend_gemini.model),
+                batch_size=backend_gemini.get("batch_size", default_backend_gemini.batch_size),
+                max_output_tokens_per_unit=backend_gemini.get(
+                    "max_output_tokens_per_unit",
+                    default_backend_gemini.max_output_tokens_per_unit,
+                ),
             ),
         ),
         glossary=GlossaryConfig(

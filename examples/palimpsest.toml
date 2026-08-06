@@ -28,8 +28,16 @@ entities = "private/entities.toml"
 documents = "private/documents.toml"
 
 [backend]
-name = "anthropic"      # "anthropic" | "google"
-fallback = "google"     # used if the primary backend errors or refuses
+name = "gemini"          # "gemini" | "anthropic" | "google"
+fallback = "anthropic"   # used if the primary backend errors or refuses
+
+[backend.gemini]
+model = "gemini-3.5-flash-lite"
+batch_size = 20
+max_output_tokens_per_unit = 4096
+# API key comes from $GEMINI_API_KEY (or $GOOGLE_API_KEY). Free to obtain
+# from Google AI Studio -- no billing setup required. Never put a key in
+# this file.
 
 [backend.anthropic]
 model = "claude-opus-5"

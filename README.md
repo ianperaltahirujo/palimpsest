@@ -8,15 +8,16 @@ artwork, same typography — only the words change.*
 Layout-preserving Spanish→English document translation for PDF and
 Office formats (`.pptx` / `.xlsx` / `.docx`): OCR when there's no text
 layer, styled-run extraction, in-place redraw with real embedded fonts,
-entity/glossary-aware machine translation (Google or Claude), and an
-honest translation cache that never lets a failed translation masquerade
-as a successful one.
+entity/glossary-aware machine translation (Gemini, Claude, or Google
+Translate), and an honest translation cache that never lets a failed
+translation masquerade as a successful one.
 
 ## Install
 
 ```bash
-pip install palimpsest-translate            # Google backend only, free
-pip install palimpsest-translate[anthropic] # + Claude backend (recommended)
+pip install palimpsest-translate            # Google Translate backend only, free, no key
+pip install palimpsest-translate[gemini]    # + Gemini backend (default, free API key)
+pip install palimpsest-translate[anthropic] # + Claude backend (paid, highest quality)
 pip install palimpsest-translate[ocr]       # + OCR for scanned PDFs (needs Tesseract on PATH)
 pip install palimpsest-translate[all]       # everything
 ```
@@ -32,8 +33,9 @@ pip install -e ".[all,dev]"
 ## Quickstart
 
 ```bash
-palimpsest translate deed.pdf                    # -> deed.en.pdf, Google backend (no setup)
+palimpsest translate deed.pdf                    # -> deed.en.pdf, Gemini backend (needs GEMINI_API_KEY, free)
 palimpsest translate deed.pdf --backend anthropic # needs ANTHROPIC_API_KEY in the environment
+palimpsest translate deed.pdf --backend google    # Google Translate, no key at all
 palimpsest translate deed.pdf --dry-run           # classify, count paragraphs, estimate cost -- no translation
 ```
 
@@ -104,9 +106,11 @@ de-identified) from the pipeline this project was extracted from:
 - [`limitations.md`](docs/design/limitations.md) — an honest account of
   what this pipeline does not handle, from a real corpus run rather than
   written speculatively.
-- [`backends.md`](docs/design/backends.md) — why the Google and Claude
-  backends handle entity protection completely differently, and the
-  pricing/quality tradeoffs between them.
+- [`backends.md`](docs/design/backends.md) — why the Gemini/Claude LLM
+  backends handle entity protection completely differently from Google
+  Translate's phrase-level API, why Gemini is the default despite Claude
+  being the stronger model, and the pricing/quality tradeoffs between all
+  three.
 
 ## Architecture
 
@@ -119,16 +123,18 @@ src/palimpsest/
   text/                   entity protection, glossary, ordinals, post-translation fixups
   pdf/                    classify, OCR, layout extraction, font resolution, clearing, render, pipeline
   office/                 OOXML surgery (translate .xlsx/.docx/.pptx by editing the zip in place)
-  translate/              backend protocol, Google + Claude backends, cache, cost estimation
+  translate/              backend protocol, Gemini + Claude + Google backends, cache, cost estimation
   qa/                     side-by-side comparison renders, bilingual PDF output, cache audit
 ```
 
-Two backends behind one `Backend` protocol: Google (`deep-translator`,
-free, phrase-level — entities are protected by placeholder substitution)
-and Claude (the `anthropic` SDK — entities are protected by prompt
-instruction plus a post-hoc verification pass, since an LLM benefits from
-reading the whole sentence in a way placeholder substitution would
-defeat). See `docs/design/backends.md` for why they're architected
+Three backends behind one `Backend` protocol: Gemini (the `google-genai`
+SDK, free-tier, LLM — the default) and Claude (the `anthropic` SDK, paid,
+LLM) both protect entities by prompt instruction plus a post-hoc
+verification pass, since an LLM benefits from reading the whole sentence
+in a way placeholder substitution would defeat; Google Translate
+(`deep-translator`, free, phrase-level, no key at all) has no concept of
+"entity" at all, so its entities are protected by placeholder substitution
+instead. See `docs/design/backends.md` for why they're architected
 differently rather than sharing one protection scheme.
 
 ## What this borrows from, and doesn't share code with

@@ -1,4 +1,12 @@
-from palimpsest.config.model import BackendConfig, Config, GoogleBackendConfig, PathsConfig
+import pytest
+
+from palimpsest.config.model import (
+    BackendConfig,
+    Config,
+    GeminiBackendConfig,
+    GoogleBackendConfig,
+    PathsConfig,
+)
 from palimpsest.text.glossary import Glossary
 from palimpsest.translate.backend import TranslationContext, TranslationResult
 from palimpsest.translate.google import GoogleBackend
@@ -33,6 +41,23 @@ def test_make_backend_wires_google_config_fields():
 def test_make_backend_no_fallback_when_same_as_primary():
     backend = make_backend(_config(name="google", fallback="google"))
     assert isinstance(backend, GoogleBackend)
+
+
+def test_make_backend_wires_gemini_config_fields(monkeypatch):
+    genai = pytest.importorskip("google.genai")
+    from tests.fixtures.fake_gemini_client import FakeGeminiClient
+
+    monkeypatch.setattr(genai, "Client", lambda: FakeGeminiClient())
+    cfg = Config(
+        backend=BackendConfig(
+            name="gemini", fallback=None,
+            gemini=GeminiBackendConfig(model="gemini-3.6-flash", batch_size=7),
+        )
+    )
+    backend = make_backend(cfg)
+    assert backend.name == "gemini"
+    assert backend.model == "gemini-3.6-flash"
+    assert backend.max_batch == 7
 
 
 def test_make_backend_wraps_fallback():

@@ -31,13 +31,14 @@ dependencies = [
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.40"]
+gemini = ["google-genai>=1.0"]
 ocr = ["ocrmypdf>=16.0"]
 dev = [
   "pytest>=8.0",
   "ruff>=0.6",
   "mypy>=1.10",
 ]
-all = ["palimpsest-translate[anthropic,ocr]"]
+all = ["palimpsest-translate[anthropic,gemini,ocr]"]
 
 [project.scripts]
 palimpsest = "palimpsest.cli:main"
@@ -64,10 +65,12 @@ ignore = [
 # be wrapped -- wrapping would either break the XML or hurt readability.
 "tests/unit/test_ooxml.py" = ["E501"]
 "tests/unit/test_office_pipeline.py" = ["E501"]
-# pytest.importorskip("anthropic") must run before importing anything that
-# transitively imports the anthropic package, so the module-level imports
-# below it are deliberate, not an ordering mistake.
+# pytest.importorskip("anthropic") / pytest.importorskip("google.genai")
+# must run before importing anything that transitively imports the
+# optional package, so the module-level imports below them are
+# deliberate, not an ordering mistake.
 "tests/unit/test_anthropic_backend.py" = ["E402"]
+"tests/unit/test_gemini_backend.py" = ["E402"]
 
 [tool.mypy]
 # Not a floor on runtime support (that's [project].requires-python, ">=3.11",

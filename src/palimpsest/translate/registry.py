@@ -31,7 +31,7 @@ from palimpsest.translate.cache import compute_namespace
 from palimpsest.translate.google import GoogleBackend
 from palimpsest.translate.translator import Translator
 
-_KNOWN = ("google", "anthropic")
+_KNOWN = ("google", "anthropic", "gemini")
 
 
 def _build_one(name: str, config: Config) -> Backend:
@@ -42,6 +42,10 @@ def _build_one(name: str, config: Config) -> Backend:
         from palimpsest.translate.anthropic import AnthropicBackend
 
         return AnthropicBackend.from_config(config.backend.anthropic)
+    if name == "gemini":
+        from palimpsest.translate.gemini import GeminiBackend
+
+        return GeminiBackend.from_config(config.backend.gemini)
     raise ConfigError(f"unknown backend {name!r} (expected one of {_KNOWN})")
 
 
