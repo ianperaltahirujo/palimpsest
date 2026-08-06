@@ -88,6 +88,35 @@ def test_protect_covers_currency_and_bare_numbers():
     assert set(tokens) == {"RD$1,250.50", "US$400", "37"}
 
 
+def test_short_entity_does_not_match_inside_an_unrelated_word():
+    """A real regression found translating a securities-sector filing: the
+    protected abbreviation 'CCI' (a real broker-dealer ticker) matched as
+    a bare substring inside ordinary Spanish words that happen to contain
+    the same three letters -- 'contraCCIon' (contracción), 'reduCCIon'
+    (reducción) -- corrupting them into 'against[[N]]' / 'net[[N]]' after
+    the surrounding word got machine-translated around the placeholder.
+    Spanish '-cción' is a common suffix, so this wasn't a one-off."""
+    protect_re = build_protect_re(["CCI"])
+    text = "una contracción neta y una reducción similar, con CCI presente"
+    placeheld, tokens = protect(text, protect_re)
+    assert "contracción" in placeheld
+    assert "reducción" in placeheld
+    assert tokens == ["CCI"]
+
+
+def test_entity_ending_in_punctuation_still_matches_at_sentence_end():
+    """The boundary fix above must not regress entities that themselves
+    end in punctuation (a real entry: 'Grupo Aurora, SRL.') -- a naive
+    `\\b` word-boundary anchor would never match here, since `\\b` needs a
+    word-character transition and a trailing '.' followed by a space
+    never provides one."""
+    protect_re = build_protect_re(["Grupo Aurora, SRL."])
+    text = "La empresa contratante es Grupo Aurora, SRL. y firmo el acuerdo."
+    placeheld, tokens = protect(text, protect_re)
+    assert tokens == ["Grupo Aurora, SRL."]
+    assert restore(placeheld, tokens) == text
+
+
 # -- protected_word_fragments ----------------------------------------------
 
 def test_fragments_only_from_multiword_entities():

@@ -37,17 +37,36 @@ _TOKEN_RE = re.compile(r"\[\[(\d+)\]\]")
 _NAME_CHARS = r"A-Za-zÀ-ÖØ-öø-ÿ"
 
 
+_BOUNDARY_CHARS = _NAME_CHARS + "0-9"
+
+
 def build_protect_re(entities: Iterable[str]) -> re.Pattern[str]:
     """Regex matching entities (plus bare numbers/currency amounts) that
     must survive translation verbatim. Case-insensitive; matches both the
-    accented and accent-stripped spelling of every entry."""
+    accented and accent-stripped spelling of every entry.
+
+    A short entity is guarded on both sides against being just a
+    SUBSTRING of an unrelated word -- a real corpus produced protected
+    abbreviations like "CCI" that are also a bare letter run inside
+    ordinary Spanish words ("contra-CCI-on", "redu-CCI-on": Spanish
+    "-cción" is a common suffix). Plain `\\b` can't be used for this: an
+    entity is free to itself end in punctuation (`"Grupo Aurora, SRL."`),
+    and `\\b` requires a word-character transition at the match edge,
+    which a trailing "." never provides -- it would silently stop such
+    entities from ever matching. The lookarounds below instead just
+    forbid a letter/digit immediately adjacent to the match, regardless
+    of what character the match itself starts or ends with.
+    """
     variants = set()
     for s in entities:
         variants.add(s)
         variants.add(strip_accents(s))
     parts = [re.escape(s) for s in sorted(variants, key=len, reverse=True)]
-    parts += [r"RD\$[\d.,]+", r"US\$[\d.,]+", r"\$[\d.,]+", r"\b\d[\d.,]*\b"]
-    return re.compile("(" + "|".join(parts) + ")", re.IGNORECASE)
+    number_parts = [r"RD\$[\d.,]+", r"US\$[\d.,]+", r"\$[\d.,]+", r"\b\d[\d.,]*\b"]
+    if parts:
+        entity_alt = f"(?<![{_BOUNDARY_CHARS}])(?:{'|'.join(parts)})(?![{_BOUNDARY_CHARS}])"
+        parts = [entity_alt]
+    return re.compile("(" + "|".join(parts + number_parts) + ")", re.IGNORECASE)
 
 
 def protect(text: str, protect_re: re.Pattern[str]) -> tuple[str, list[str]]:
