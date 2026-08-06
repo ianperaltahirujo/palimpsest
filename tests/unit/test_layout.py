@@ -159,6 +159,32 @@ def test_extract_paragraphs_skips_pure_numeric_lines():
     assert paras == []
 
 
+def test_extract_paragraphs_rejects_size_wildly_larger_than_its_own_bbox(monkeypatch):
+    """A real regression: OCR misread a few characters of noise out of a
+    government seal/QR-code graphic on a scanned document and reported a
+    huge inferred font size for it (44.36pt), because that size came from
+    the apparent glyph height within the graphic it was misread from, not
+    any real font metric -- the bbox stayed tiny (under 19pt), since the
+    "glyphs" were small artifacts. Nothing capped the resulting draw size,
+    so it rendered as a giant word stamped over a signature block,
+    overlapping the page. Real text's size and its own single-line bbox
+    height move together; this rejects when they wildly disagree instead
+    of trusting the size at face value."""
+    span = {
+        "text": "DIS", "font": "Helvetica", "size": 44.36, "flags": 0,
+        "color": 0, "origin": (210.0, 690.0),
+        "bbox": (210.0, 679.8, 439.7, 698.7),  # only ~19pt tall -- not ~44pt
+    }
+    line = {"bbox": span["bbox"], "spans": [span]}
+    block = {"type": 0, "bbox": span["bbox"], "lines": [line]}
+    fake_dict = {"blocks": [block]}
+
+    monkeypatch.setattr(fitz.Page, "get_text", lambda self, *a, **kw: fake_dict)
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    assert layout.extract_paragraphs(page) == []
+
+
 def test_merge_flowing_paragraphs_noop_on_single_paragraph():
     doc = synth.simple_paragraph_page()
     paras = layout.extract_paragraphs(doc[0])

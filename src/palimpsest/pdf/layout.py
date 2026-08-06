@@ -38,6 +38,22 @@ _ZW_RE = re.compile("[​‌‍﻿]")
 NUM_ONLY_RE = re.compile(r"^[\d.,()%\-\s–—°ºª/:$]*$")
 BULLET_CHARS = {"•", "●", "○", "◦", "▪", "§", "·", "-", "—", "–"}
 
+# A real single-line span's declared size and its own measured bbox height
+# move together -- for genuine text, size/height sits well under 1. On a
+# scanned page, OCR occasionally reads a few characters of noise out of a
+# large decorative graphic (a seal, a QR code, a signature block) and
+# reports a huge inferred size for it, because that size comes from the
+# apparent glyph height *within the graphic region it was misread from*,
+# not from any real font metric. The bbox stays small (a handful of
+# points -- the actual "glyphs" are tiny artifacts), so the ratio spikes
+# far past anything real text produces. Rejecting on that ratio, not on
+# the size or the recognized text alone, is what catches this: the size
+# alone looks like a plausible large heading, and the text alone can look
+# like plausible short noise either way -- it's the two disagreeing that
+# gives it away. See docs/design/limitations.md for the general
+# "OCR reads noise out of decorative graphics" limitation this sharpens.
+_MAX_SIZE_TO_HEIGHT_RATIO = 1.5
+
 # fitz span flag bits
 FLAG_ITALIC = 1 << 1
 FLAG_BOLD = 1 << 4
@@ -479,6 +495,8 @@ def extract_paragraphs(
             dom = _dominant_span([s for ln in lines for s in ln["spans"]])
             size = dom.get("size", 10.0)
             if size < min_size:
+                continue
+            if len(lines) == 1 and size > rect.height * _MAX_SIZE_TO_HEIGHT_RATIO:
                 continue
 
             runs = _build_runs(lines)
