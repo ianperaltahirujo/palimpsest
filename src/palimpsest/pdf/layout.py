@@ -641,13 +641,20 @@ def available_rect(
     top of them.
     """
     r = fitz.Rect(para.rect)
+    limit = page.rect.y1 - bottom_margin
     if para.clip is not None:
         # Confine to the column so text can never bleed into the next one.
         col = fitz.Rect(para.clip)
         r.x0 = max(r.x0, col.x0)
         r.x1 = min(max(r.x1, r.x0 + 10.0), col.x1 + cell_pad)
+        # The cell's own bottom rule bounds downward growth too -- without
+        # this, a cell with no extracted paragraph below it (common on a
+        # scanned table row where the neighbouring cell's content didn't
+        # qualify as translatable, e.g. it was a bare "N/D") had nothing
+        # to stop it growing, and a translation running a line longer
+        # than its source bled straight through into the next row.
+        limit = min(limit, col.y1 - 1.0)
 
-    limit = page.rect.y1 - bottom_margin
     for other in paras:
         if other is para:
             continue

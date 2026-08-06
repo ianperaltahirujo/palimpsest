@@ -1,4 +1,5 @@
 import fitz
+import pytest
 
 from palimpsest.pdf import layout
 from tests.fixtures import synth
@@ -183,6 +184,56 @@ def test_extract_paragraphs_rejects_size_wildly_larger_than_its_own_bbox(monkeyp
     doc = fitz.open()
     page = doc.new_page(width=600, height=800)
     assert layout.extract_paragraphs(page) == []
+
+
+# -- available_rect: table-cell vertical bound (previously untested at all) --
+
+def _para(rect, clip=None) -> layout.Para:
+    return layout.Para(
+        text="x", runs=[], rect=fitz.Rect(rect), origin=(rect[0], rect[3]),
+        align="left", leading=12.0, size=10.0, font="Helvetica",
+        color=(0, 0, 0), page=0, indent=0.0, line_rects=[fitz.Rect(rect)],
+        block_no=0, clip=fitz.Rect(clip) if clip else None, hang_x0=None,
+        starts_item=False,
+    )
+
+
+def test_available_rect_bounded_by_own_clip_with_no_paragraph_below():
+    """The exact regression: a table cell whose neighbouring cell in the
+    row below has no extracted paragraph of its own (a real cause: it was
+    a bare 'N/D' or otherwise didn't qualify as translatable) had nothing
+    to stop it growing, so its clip -- the cell's own bottom edge, known
+    at extraction time -- must bound it directly instead of falling back
+    all the way to the page margin. The paragraph's own rect is narrower
+    than its cell (a short line inside a taller cell), matching the real
+    case: a one-line source paragraph translating into more lines than
+    it started with, needing genuine room to grow, but only up to the
+    cell's own bottom rule -- not past it."""
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    para = _para((420, 296.6, 581, 305.5), clip=(420, 296.6, 581, 315.9))
+    avail = layout.available_rect(page, para, [para])
+    assert avail.y1 == pytest.approx(314.9, abs=0.01)  # clip.y1 - 1.0
+
+
+def test_available_rect_grows_into_free_space_when_no_clip():
+    """Without a clip (ordinary flowing prose, not a table cell), growth
+    is still bounded only by the page margin or another paragraph below
+    -- this must keep working exactly as before the clip-bound fix."""
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    para = _para((50, 100, 300, 115))
+    avail = layout.available_rect(page, para, [para])
+    assert avail.y1 == pytest.approx(page.rect.y1 - 18.0)  # default bottom_margin
+
+
+def test_available_rect_still_bounded_by_paragraph_below_when_present():
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=800)
+    para = _para((50, 100, 300, 115))
+    below = _para((50, 200, 300, 215))
+    avail = layout.available_rect(page, para, [para, below])
+    assert avail.y1 == pytest.approx(199.0)  # below.y0 - 1.0
 
 
 def test_merge_flowing_paragraphs_noop_on_single_paragraph():
