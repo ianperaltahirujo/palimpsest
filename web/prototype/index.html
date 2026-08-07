@@ -1,0 +1,2244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>palimpsest</title>
+<meta name="description" content="Layout-preserving Spanish→English document translation. Design prototype, mock data only.">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  --ink:      #14181D;
+  --ink-soft: #4B525C;
+  --ink-faint:#8B929C;
+  --leaf:     #F6F5F2;
+  --leaf-raised: #FDFCFA;
+  --leaf-sunk:   #ECEAE5;
+  --rule:     #C3C9D0;
+  --rule-soft:#DBDFE3;
+  --register: #0B5FD0;
+  --register-ink: #08429A;
+  --register-wash: #E7EFFC;
+  --under:    #C81E78;
+  --under-ink:#9E1660;
+  --under-wash:#FBE6F1;
+  --flag:     #C2410C;
+  --flag-wash:#FBEAE0;
+  --ok:       #147154;
+  --ok-wash:  #E4F3EC;
+
+  --font-display: "Archivo Expanded", "Arial Narrow", sans-serif;
+  --font-body:    "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  --rail-w: 296px;
+  --topbar-h: 58px;
+  --radius: 3px;
+  --shadow-card: 0 1px 0 var(--rule), 0 8px 24px -16px rgba(20,24,29,.35);
+}
+
+:root[data-theme="dark"], :root.pp-dark{
+  --ink:      #ECE9E2;
+  --ink-soft: #B7BCC3;
+  --ink-faint:#767D87;
+  --leaf:     #14161A;
+  --leaf-raised: #1B1E23;
+  --leaf-sunk:   #0F1114;
+  --rule:     #33383F;
+  --rule-soft:#262B31;
+  --register: #4C8FFF;
+  --register-ink: #8FBAFF;
+  --register-wash: #12203B;
+  --under:    #FF62AC;
+  --under-ink:#FF9BC8;
+  --under-wash:#3A1428;
+  --flag:     #FF8A5C;
+  --flag-wash:#3A2013;
+  --ok:       #55CC9C;
+  --ok-wash:  #10281F;
+  --shadow-card: 0 1px 0 var(--rule), 0 8px 24px -16px rgba(0,0,0,.6);
+}
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:      #ECE9E2;
+    --ink-soft: #B7BCC3;
+    --ink-faint:#767D87;
+    --leaf:     #14161A;
+    --leaf-raised: #1B1E23;
+    --leaf-sunk:   #0F1114;
+    --rule:     #33383F;
+    --rule-soft:#262B31;
+    --register: #4C8FFF;
+    --register-ink: #8FBAFF;
+    --register-wash: #12203B;
+    --under:    #FF62AC;
+    --under-ink:#FF9BC8;
+    --under-wash:#3A1428;
+    --flag:     #FF8A5C;
+    --flag-wash:#3A2013;
+    --ok:       #55CC9C;
+    --ok-wash:  #10281F;
+    --shadow-card: 0 1px 0 var(--rule), 0 8px 24px -16px rgba(0,0,0,.6);
+  }
+}
+
+/* ============================================================
+   RESET
+   ============================================================ */
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  background:var(--leaf);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:14.5px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  transition:background .25s ease, color .25s ease;
+}
+h1,h2,h3,p,ul,ol,dl,dd{ margin:0; }
+ul{ list-style:none; padding:0; }
+button,input,select,textarea{ font:inherit; color:inherit; }
+button{ cursor:pointer; }
+img{ max-width:100%; display:block; }
+:focus-visible{ outline:2px solid var(--register); outline-offset:2px; }
+a{ color:var(--register); }
+
+/* ============================================================
+   SHELL
+   ============================================================ */
+.shell{
+  display:grid;
+  grid-template-columns: var(--rail-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr;
+  grid-template-areas: "top top" "rail stage";
+  min-height:100vh;
+}
+
+/* ---- top bar ---- */
+.topbar{
+  grid-area:top;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+  border-bottom:1px solid var(--rule);
+  background:var(--leaf-raised);
+  gap:16px;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  font-family:var(--font-display);
+  font-weight:800;
+  font-stretch:118%;
+  font-size:16.5px;
+  letter-spacing:.01em;
+  white-space:nowrap;
+}
+.regmark{ width:19px; height:19px; flex:0 0 auto; }
+.regmark .m,.regmark .u{ transition: transform .5s cubic-bezier(.16,1,.3,1); }
+.regmark .m{ stroke:var(--under); mix-blend-mode:multiply; transform:translate(-0.5px,0.5px); }
+.regmark .u{ stroke:var(--register); mix-blend-mode:multiply; transform:translate(0.5px,-0.5px); }
+:root[data-theme="dark"] .regmark .m,
+:root[data-theme="dark"] .regmark .u{ mix-blend-mode:screen; }
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .regmark .m,
+  :root:not([data-theme="light"]) .regmark .u{ mix-blend-mode:screen; }
+}
+.brand:hover .regmark .m,.brand:hover .regmark .u{ transform:translate(0,0); }
+
+.topbar-right{ display:flex; align-items:center; gap:10px; }
+.pill-select{
+  display:flex; align-items:center; gap:7px;
+  border:1px solid var(--rule); border-radius:999px;
+  padding:5px 12px 5px 10px; background:var(--leaf);
+  font-family:var(--font-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.05em;
+}
+.dot{ width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+.dot.on{ background:var(--ok); box-shadow:0 0 0 3px var(--ok-wash); }
+.dot.off{ background:var(--ink-faint); }
+.dot.warn{ background:var(--flag); box-shadow:0 0 0 3px var(--flag-wash); }
+
+.icon-btn{
+  width:32px; height:32px; display:grid; place-items:center;
+  border:1px solid var(--rule); border-radius:var(--radius); background:var(--leaf);
+}
+.icon-btn:hover{ background:var(--leaf-sunk); }
+.rail-toggle{ display:none; }
+
+/* Sun/moon: a fixed ray group plus a circle that carves a crescent out of
+   the core circle via an SVG mask -- animating the mask circle's cx/cy
+   (both are CSS-animatable SVG presentation attributes) slides the "bite"
+   in and out, so the two states are one continuous morph, not a swap.
+   Global prefers-reduced-motion (below) already zeroes every transition
+   duration on the page, this included -- no separate override needed. */
+.theme-rays{
+  transition: opacity .35s cubic-bezier(.16,1,.3,1), transform .35s cubic-bezier(.16,1,.3,1);
+  transform-origin: 8px 8px;
+}
+#moonCut{ transition: cx .35s cubic-bezier(.16,1,.3,1), cy .35s cubic-bezier(.16,1,.3,1); }
+.theme-icon[data-icon="dark"] .theme-rays{ opacity:0; transform:scale(.4) rotate(-40deg); }
+.theme-icon[data-icon="dark"] #moonCut{ cx:10.4px; cy:4.6px; }
+
+/* ---- rail ---- */
+.rail{
+  grid-area:rail;
+  position:relative;
+  border-right:1px solid var(--rule);
+  background:var(--leaf-raised);
+  overflow-y:auto;
+  padding:44px 18px 40px;
+}
+.rail-collapse-btn{
+  position:absolute; top:10px; right:10px; z-index:1;
+  width:26px; height:26px; display:none; place-items:center;
+  border:1px solid var(--rule); border-radius:var(--radius); background:var(--leaf);
+  color:var(--ink-faint);
+}
+.rail-collapse-btn:hover{ background:var(--leaf-sunk); color:var(--ink); }
+.rail-reveal{
+  display:none; position:fixed; left:0; top:calc(var(--topbar-h) + 14px); z-index:30;
+  width:26px; height:34px; align-items:center; justify-content:center;
+  border:1px solid var(--rule); border-left:none; border-radius:0 6px 6px 0;
+  background:var(--leaf-raised); color:var(--ink-faint); box-shadow:var(--shadow-card);
+}
+.rail-reveal:hover{ color:var(--ink); }
+/* Collapse is a desktop-only mechanism -- below 900px the rail already
+   uses the drawer/scrim pattern (see the responsive block), and the two
+   must never combine or the rail could end up simultaneously collapsed
+   AND slid off-canvas with no visible way back in. */
+@media (min-width:901px){
+  .rail-collapse-btn{ display:grid; }
+  .shell.rail-collapsed{ grid-template-columns: 0 1fr; }
+  .shell.rail-collapsed .rail{ display:none; }
+  .shell.rail-collapsed .rail-reveal{ display:flex; }
+}
+.rail-section{ padding:16px 0; border-bottom:1px solid var(--rule-soft); }
+.rail-section:first-child{ padding-top:2px; }
+.rail-section:last-child{ border-bottom:none; }
+.rail-label{
+  display:flex; align-items:center; justify-content:space-between;
+  font-family:var(--font-mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--ink-faint); margin-bottom:11px;
+}
+.rail-label .count{ color:var(--ink-soft); }
+
+/* Vendor colour (Gemini's blue-purple gradient, Claude's orange, Google's
+   blue) is deliberately contained to this one control -- the Registration
+   system uses blue/magenta SEMANTICALLY (translated layer vs. original)
+   elsewhere in the app, and letting a vendor hue leak into that language
+   would corrupt it. Here it only ever appears as a left-edge bar (active
+   row) or a small identity dot (every row). */
+.radio-row{
+  display:flex; align-items:flex-start; gap:9px;
+  padding:8px 9px 8px 13px; border-radius:var(--radius); cursor:pointer;
+  border:1px solid transparent; position:relative;
+}
+.radio-row::before{
+  content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px;
+  border-radius:2px; opacity:0; transition:opacity .15s ease;
+}
+.radio-row.active::before{ opacity:1; }
+.radio-row[data-backend="gemini"]::before{ background:linear-gradient(180deg,#4796E3,#9177C7); }
+.radio-row[data-backend="anthropic"]::before{ background:#D97757; }
+.radio-row[data-backend="google"]::before{ background:#4285F4; }
+.radio-row:hover{ background:var(--leaf-sunk); }
+.radio-row input{ margin-top:3px; accent-color:var(--register); }
+.radio-row .rr-title{ font-weight:600; font-size:13.5px; display:inline-flex; align-items:center; gap:6px; }
+.radio-row .rr-sub{ font-size:11.5px; color:var(--ink-soft); margin-top:1px; }
+.radio-row.active{ background:var(--register-wash); border-color:var(--register); }
+.vendor-dot{ width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+.radio-row[data-backend="gemini"] .vendor-dot{ background:linear-gradient(135deg,#4796E3,#9177C7); }
+.radio-row[data-backend="anthropic"] .vendor-dot{ background:#D97757; }
+.radio-row[data-backend="google"] .vendor-dot{ background:#4285F4; }
+
+.field{ margin-top:10px; }
+.field label{ display:block; font-size:11.5px; color:var(--ink-soft); margin-bottom:5px; }
+.input, .select, textarea.input{
+  width:100%; padding:8px 10px; border:1px solid var(--rule);
+  border-radius:var(--radius); background:var(--leaf); font-size:13px;
+  font-family:var(--font-mono);
+}
+.input:focus,.select:focus,textarea.input:focus{ border-color:var(--register); }
+.help{ font-size:11.5px; color:var(--ink-faint); margin-top:6px; line-height:1.5; }
+.key-row{ display:flex; gap:6px; margin-top:8px; }
+.key-row .input{ flex:1; }
+.btn-mini{
+  padding:7px 11px; border:1px solid var(--rule); border-radius:var(--radius);
+  background:var(--leaf); font-size:11.5px; font-family:var(--font-mono); white-space:nowrap;
+}
+.btn-mini:hover{ background:var(--leaf-sunk); }
+.key-status{ font-size:11px; margin-top:7px; display:flex; align-items:center; gap:6px; color:var(--ink-soft); }
+
+.chip-groups{ display:flex; flex-direction:column; gap:12px; }
+.chip-group-h{ font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:6px; font-family:var(--font-mono); }
+.chips{ display:flex; flex-wrap:wrap; gap:6px; }
+.chip{
+  display:inline-flex; align-items:center; gap:6px;
+  border:1px solid var(--rule); background:var(--leaf); border-radius:999px;
+  padding:4px 6px 4px 10px; font-size:12px; font-family:var(--font-mono);
+}
+.chip button{ background:none; border:none; padding:0; width:16px; height:16px; border-radius:50%; display:grid; place-items:center; color:var(--ink-faint); }
+.chip button:hover{ background:var(--flag-wash); color:var(--flag); }
+.chip.suggested{ border-style:dashed; color:var(--ink-soft); background:transparent; }
+.chip.suggested button{ color:var(--register); }
+.add-row{ display:flex; gap:6px; margin-top:10px; }
+.add-row .input{ flex:1; }
+.rail-links{ display:flex; gap:14px; margin-top:10px; }
+.rail-links button{ background:none; border:none; padding:0; font-size:11px; color:var(--register); font-family:var(--font-mono); text-decoration:underline; text-underline-offset:2px; }
+
+.check-row{ display:flex; align-items:center; gap:9px; padding:6px 0; font-size:13px; }
+.check-row input{ accent-color:var(--register); width:15px; height:15px; }
+
+details.adv{ border:none; }
+details.adv > summary{
+  list-style:none; cursor:pointer; display:flex; align-items:center; gap:6px;
+  font-family:var(--font-mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-faint);
+}
+details.adv > summary::-webkit-details-marker{ display:none; }
+details.adv > summary::before{ content:"▸"; display:inline-block; transition:transform .15s; font-size:9px; }
+details.adv[open] > summary::before{ transform:rotate(90deg); }
+details.adv .adv-body{ padding-top:12px; display:flex; flex-direction:column; gap:12px; }
+.toggle-row{ display:flex; align-items:center; justify-content:space-between; }
+.switch{ position:relative; width:34px; height:19px; }
+.switch input{ opacity:0; width:100%; height:100%; position:absolute; margin:0; }
+.switch .track{ position:absolute; inset:0; background:var(--rule); border-radius:999px; transition:background .15s; }
+.switch .knob{ position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%; background:var(--leaf-raised); transition:transform .15s; box-shadow:0 1px 2px rgba(0,0,0,.3); }
+.switch input:checked + .track{ background:var(--register); }
+.switch input:checked ~ .knob{ transform:translateX(15px); }
+
+/* ---- stage ---- */
+.stage{ grid-area:stage; overflow-y:auto; position:relative; }
+.state{ display:none; min-height:100%; }
+.state.active{ display:block; }
+.state-pad{ max-width:1080px; margin:0 auto; padding:36px 40px 80px; }
+
+.eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:8px; }
+.stage-h1{ font-family:var(--font-display); font-weight:800; font-stretch:112%; font-size:28px; letter-spacing:.005em; }
+.stage-sub{ color:var(--ink-soft); margin-top:8px; font-size:14.5px; max-width:60ch; }
+
+/* ---- buttons ---- */
+.btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 18px; border-radius:var(--radius); border:1px solid var(--ink);
+  background:var(--ink); color:var(--leaf); font-weight:600; font-size:13.5px;
+}
+.btn:hover{ background:var(--register-ink); border-color:var(--register-ink); }
+.btn.secondary{ background:transparent; color:var(--ink); border-color:var(--rule); font-weight:500; }
+.btn.secondary:hover{ background:var(--leaf-sunk); }
+.btn.danger{ background:transparent; color:var(--flag); border-color:var(--flag); font-weight:500; }
+.btn.danger:hover{ background:var(--flag-wash); }
+.btn:disabled{ opacity:.45; cursor:not-allowed; }
+.btn-row{ display:flex; gap:10px; margin-top:28px; align-items:center; }
+
+/* ============================================================
+   OVERVIEW — landing: description + steps, not a tutorial
+   ============================================================ */
+.overview-pad{ max-width:640px; padding-top:56px; }
+.overview-h1{ font-size:34px; line-height:1.15; }
+.overview-sub{ margin-top:14px; font-size:15.5px; max-width:none; }
+.steps{ list-style:none; margin:32px 0 0; padding:0; display:flex; flex-direction:column; gap:18px; }
+.step{ display:flex; gap:16px; align-items:flex-start; }
+.step-n{
+  flex:0 0 auto; width:26px; height:26px; border-radius:50%;
+  border:1.5px solid var(--rule); display:grid; place-items:center;
+  font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); margin-top:1px;
+}
+.step-body{ font-size:14px; line-height:1.55; color:var(--ink-soft); }
+.step-body strong{ color:var(--ink); font-weight:600; }
+.overview-dropzone{ margin-top:40px; }
+
+/* ============================================================
+   SAMPLE — the document, dominant; hero copy lives on Overview instead
+   ============================================================ */
+.hero{ padding:32px 40px 20px; max-width:1200px; margin:0 auto; }
+/* Taller ceiling than the shared default (64vh, used by the Results
+   compare view where the page shares the screen with a topline/panel) --
+   Sample has nothing else on the stage, so the document can take most of
+   the viewport height. */
+[data-state="sample"] .page-base{ max-height:78vh; }
+
+/* `.page-stack` shrink-wraps EXACTLY around `.page-base` (a normal-flow
+   replaced element honours max-width+max-height together correctly, unlike
+   the old `.wipe`, which set `aspect-ratio` AND `max-height` -- once
+   max-height clamped, aspect-ratio stopped matching the image and
+   object-fit:cover silently cropped the page). That exactness matters
+   beyond the wipe itself: it's what lets an edit-mode overlay at
+   `inset:0` register against real page coordinates with zero JS. */
+.page-stack{
+  position:relative; display:inline-block; margin:0 auto;
+  border-radius:6px; overflow:hidden;
+  border:1px solid var(--rule); background:var(--leaf-sunk);
+  box-shadow:var(--shadow-card);
+  cursor:ew-resize;
+  touch-action:none;
+  max-width:100%;
+}
+.page-base{ display:block; max-width:100%; max-height:64vh; width:auto; height:auto; user-select:none; -webkit-user-drag:none; }
+.page-wipe{
+  position:absolute; inset:0; width:100%; height:100%;
+  user-select:none; -webkit-user-drag:none;
+  clip-path: inset(0 0 0 var(--wipe-pct,50%));
+}
+.edit-layer{ position:absolute; inset:0; }
+.wipe-divider{
+  position:absolute; top:0; bottom:0; left:var(--wipe-pct,50%); z-index:3;
+  width:0; transform:translateX(-1px);
+  pointer-events:none;
+}
+.wipe-divider::before{ content:""; position:absolute; top:0; bottom:0; left:0; width:2px; background:var(--ink); box-shadow:0 0 0 1px var(--leaf); }
+.wipe-handle{
+  position:absolute; top:50%; left:0; transform:translate(-50%,-50%);
+  width:34px; height:34px; border-radius:50%; background:var(--ink); color:var(--leaf);
+  display:grid; place-items:center; box-shadow:0 2px 10px rgba(0,0,0,.35);
+  pointer-events:none;
+}
+.wipe-label{
+  position:absolute; top:14px; z-index:4; font-family:var(--font-mono); font-size:10.5px;
+  letter-spacing:.09em; text-transform:uppercase; padding:5px 10px; border-radius:999px;
+  color:#fff; pointer-events:none;
+}
+.wipe-label.src{ left:14px; background:var(--under); }
+.wipe-label.out{ right:14px; background:var(--register); }
+.wipe-note{ text-align:center; font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); margin-top:14px; }
+
+.dropzone{
+  margin-top:26px; border:1.5px dashed var(--rule); border-radius:6px;
+  padding:26px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  background:var(--leaf-raised);
+}
+.dropzone.dragover{ border-color:var(--register); background:var(--register-wash); }
+.dropzone-copy .dz-title{ font-weight:700; font-size:15px; }
+.dropzone-copy .dz-sub{ color:var(--ink-soft); font-size:12.5px; margin-top:3px; }
+.dropzone input[type=file]{ display:none; }
+
+/* ============================================================
+   B · QUEUE
+   ============================================================ */
+.file-list{ display:flex; flex-direction:column; gap:10px; margin-top:22px; }
+.file-row{
+  display:flex; align-items:center; gap:14px; padding:14px 16px;
+  border:1px solid var(--rule); border-radius:var(--radius); background:var(--leaf-raised);
+}
+.file-icon{ width:34px; height:34px; border:1px solid var(--rule); border-radius:3px; display:grid; place-items:center; font-family:var(--font-mono); font-size:9px; color:var(--ink-soft); flex:0 0 auto; }
+.file-meta{ flex:1; min-width:0; }
+.file-name{ font-weight:600; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.file-sub{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-soft); margin-top:3px; display:flex; gap:10px; flex-wrap:wrap; }
+.badge{ display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:999px; font-size:10.5px; font-family:var(--font-mono); letter-spacing:.04em; text-transform:uppercase; }
+.badge.digital{ background:var(--ok-wash); color:var(--ok); }
+.badge.ocr{ background:var(--register-wash); color:var(--register-ink); }
+.badge.scan{ background:var(--flag-wash); color:var(--flag); }
+.file-remove{ background:none; border:none; color:var(--ink-faint); width:28px; height:28px; border-radius:var(--radius); display:grid; place-items:center; flex:0 0 auto; }
+.file-remove:hover{ background:var(--flag-wash); color:var(--flag); }
+.scan-warn{ margin-top:14px; padding:12px 14px; border:1px solid var(--flag); background:var(--flag-wash); border-radius:var(--radius); font-size:12.5px; color:var(--ink); display:flex; gap:10px; }
+
+/* ============================================================
+   C · ESTIMATE
+   ============================================================ */
+.estimate-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:var(--radius); overflow:hidden; margin-top:24px; }
+.estimate-cell{ background:var(--leaf-raised); padding:18px 20px; }
+.estimate-cell .ec-label{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+.estimate-cell .ec-value{ font-family:var(--font-display); font-weight:800; font-stretch:110%; font-size:25px; margin-top:6px; }
+.estimate-cell .ec-value.money{ color:var(--register-ink); }
+.estimate-cell .ec-value.free{ color:var(--ok); font-size:18px; }
+.estimate-cell .ec-sub{ font-size:11.5px; color:var(--ink-soft); margin-top:4px; }
+.cache-bar{ height:5px; border-radius:999px; background:var(--rule-soft); margin-top:9px; overflow:hidden; }
+.cache-bar > span{ display:block; height:100%; background:var(--ok); }
+
+/* ============================================================
+   D · RUNNING
+   ============================================================ */
+.phase-rail{ margin-top:28px; border:1px solid var(--rule); border-radius:var(--radius); overflow:hidden; background:var(--leaf-raised); }
+.phase{ display:flex; align-items:center; gap:16px; padding:16px 20px; border-bottom:1px solid var(--rule-soft); }
+.phase:last-child{ border-bottom:none; }
+.phase-icon{ width:26px; height:26px; border-radius:50%; border:1.5px solid var(--rule); display:grid; place-items:center; flex:0 0 auto; font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); }
+.phase.done .phase-icon{ background:var(--ok); border-color:var(--ok); color:#fff; }
+.phase.active .phase-icon{ border-color:var(--register); color:var(--register); animation:pulse 1.6s ease-in-out infinite; }
+.phase.pending{ opacity:.55; }
+@keyframes pulse{ 0%,100%{ box-shadow:0 0 0 0 var(--register-wash);} 50%{ box-shadow:0 0 0 5px var(--register-wash);} }
+.phase-body{ flex:1; min-width:0; }
+.phase-name{ font-weight:700; font-size:13.5px; }
+.phase-detail{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-soft); margin-top:3px; }
+.phase-bar{ height:5px; border-radius:999px; background:var(--rule-soft); margin-top:8px; overflow:hidden; }
+.phase-bar > span{ display:block; height:100%; background:var(--register); transition:width .3s ease; }
+.phase-bar.indeterminate > span{ width:38% !important; animation:indet 1.3s ease-in-out infinite; }
+@keyframes indet{ 0%{ transform:translateX(-100%);} 100%{ transform:translateX(360%);} }
+
+.run-summary{ display:flex; align-items:center; justify-content:space-between; margin-top:20px; }
+.run-progress-num{ font-family:var(--font-mono); font-size:13px; color:var(--ink-soft); }
+.cancel-note{ font-size:11.5px; color:var(--ink-faint); margin-top:6px; max-width:44ch; }
+
+/* ============================================================
+   E · RESULTS
+   ============================================================ */
+.results-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; }
+.results-headline{ font-family:var(--font-display); font-weight:800; font-stretch:112%; font-size:30px; line-height:1.2; }
+.results-headline .frac{ color:var(--register-ink); }
+.stat-strip{ display:flex; gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:var(--radius); overflow:hidden; margin-top:22px; }
+.stat{ flex:1; background:var(--leaf-raised); padding:14px 16px; text-align:left; }
+.stat .s-n{ font-family:var(--font-mono); font-weight:600; font-size:19px; }
+.stat .s-l{ font-family:var(--font-mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-faint); margin-top:3px; }
+.stat.ok .s-n{ color:var(--ok); }
+.stat.skip .s-n{ color:var(--ink-soft); }
+.stat.fail .s-n{ color:var(--flag); }
+
+.section-h{ display:flex; align-items:center; justify-content:space-between; margin-top:36px; margin-bottom:12px; }
+.section-h h2{ font-family:var(--font-display); font-weight:700; font-stretch:110%; font-size:15.5px; }
+
+.issue-row{
+  display:flex; gap:14px; align-items:flex-start; padding:13px 15px;
+  border:1px solid var(--rule); border-top:none; background:var(--leaf-raised);
+}
+.issue-row:first-of-type{ border-top:1px solid var(--rule); border-radius:3px 3px 0 0; }
+.issue-row:last-of-type{ border-radius:0 0 3px 3px; }
+.issue-row:only-of-type{ border-radius:3px; }
+.status-tag{ font-family:var(--font-mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; padding:3px 8px; border-radius:3px; flex:0 0 auto; margin-top:1px; }
+.status-tag.failed{ background:var(--flag-wash); color:var(--flag); }
+.status-tag.refused{ background:var(--under-wash); color:var(--under-ink); }
+.status-tag.identical{ background:var(--rule-soft); color:var(--ink-soft); }
+.status-tag.skipped{ background:var(--register-wash); color:var(--register-ink); }
+.issue-body{ flex:1; min-width:0; }
+.issue-text{ font-size:13px; color:var(--ink); }
+.issue-page{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); margin-top:4px; }
+.issue-jump{ background:none; border:none; color:var(--register); font-family:var(--font-mono); font-size:11px; text-decoration:underline; text-underline-offset:2px; white-space:nowrap; }
+
+.subs-box{ margin-top:14px; border:1px solid var(--rule); border-radius:var(--radius); padding:14px 16px; background:var(--leaf-raised); }
+.subs-row{ display:flex; align-items:center; gap:10px; font-family:var(--font-mono); font-size:12.5px; padding:5px 0; }
+.subs-row .arrow{ color:var(--ink-faint); }
+
+.download-row{ display:flex; gap:10px; margin-top:32px; flex-wrap:wrap; }
+.download-card{
+  display:flex; align-items:center; gap:12px; padding:13px 16px; border:1px solid var(--rule);
+  border-radius:var(--radius); background:var(--leaf-raised); min-width:200px;
+}
+.download-card:hover{ border-color:var(--ink); }
+.dl-icon{ width:30px; height:30px; border:1px solid var(--rule); border-radius:3px; display:grid; place-items:center; font-family:var(--font-mono); font-size:9px; }
+.dl-title{ font-weight:700; font-size:12.5px; }
+.dl-sub{ font-size:11px; color:var(--ink-soft); }
+
+/* ---- compare overlay (from Results "View on page") ---- */
+.compare-view{ display:none; }
+.compare-view.active{ display:block; }
+.compare-topline{ display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+.page-nav{ display:flex; align-items:center; gap:10px; font-family:var(--font-mono); font-size:12.5px; }
+.page-nav button{ width:26px; height:26px; border:1px solid var(--rule); border-radius:var(--radius); background:var(--leaf-raised); }
+
+.mode-switch{ display:flex; border:1px solid var(--rule); border-radius:999px; padding:2px; background:var(--leaf-sunk); }
+.mode-btn{ border:none; background:none; padding:6px 14px; border-radius:999px; font-size:12.5px; font-weight:600; color:var(--ink-soft); }
+.mode-btn.active{ background:var(--leaf-raised); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.12); }
+
+/* ============================================================
+   EDIT MODE — toolbar, paragraph boxes, capacity
+   ============================================================ */
+.edit-toolbar{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  border:1px solid var(--rule); border-radius:var(--radius); background:var(--leaf-raised);
+  padding:9px 14px; margin-bottom:10px;
+}
+.et-target{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-soft); min-width:120px; }
+.et-group{ display:flex; gap:4px; align-items:center; }
+.et-btn{
+  width:28px; height:28px; display:grid; place-items:center;
+  border:1px solid var(--rule); border-radius:var(--radius); background:var(--leaf);
+  font-size:13px; color:var(--ink);
+}
+.et-btn:hover:not(:disabled){ background:var(--leaf-sunk); }
+.et-btn:disabled{ opacity:.35; cursor:not-allowed; }
+.et-btn.on{ background:var(--register-wash); border-color:var(--register); color:var(--register-ink); }
+.et-swatch{ width:20px; height:20px; border-radius:50%; border:1.5px solid var(--rule); }
+.et-swatch.active{ border-color:var(--ink); box-shadow:0 0 0 2px var(--leaf), 0 0 0 3px var(--ink); }
+.et-spacer{ flex:1; }
+.et-cap{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); }
+.edit-note{ font-size:12px; color:var(--ink-soft); margin-bottom:10px; max-width:70ch; }
+.edit-footer{ display:flex; align-items:center; justify-content:space-between; margin-top:14px; flex-wrap:wrap; gap:10px; }
+.edit-status{ font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); }
+.edit-actions{ display:flex; gap:8px; }
+
+/* One box per paragraph, positioned by percentage against .page-stack
+   (which shrink-wraps the raster exactly -- see the .page-stack comment
+   above) so resize/zoom/DPR need no JS recompute for geometry. Typography
+   alone needs a JS-computed px-per-point scale (--pp-scale, set by a
+   ResizeObserver) because font-size can't be expressed as a % of width. */
+.pbox{
+  position:absolute; box-sizing:border-box;
+  border:1px solid transparent; border-radius:2px;
+  /* Masks the previously-drawn text underneath with actual paper colour
+     -- NOT var(--leaf): a PDF page is white regardless of the app's own
+     theme, so this must never react to dark mode the way the rest of the
+     UI does (it did, once; the boxes rendered as solid black tiles). */
+  background:#fdfdfc;
+  overflow:visible; cursor:default;
+}
+.pbox:hover{ border-color:var(--rule); }
+.pbox:focus{ outline:none; border-color:var(--register); box-shadow:0 0 0 1px var(--register); }
+.pbox.selected{ border-color:var(--register); box-shadow:0 0 0 1px var(--register); }
+.pbox.editing{ border-color:var(--register-ink); box-shadow:0 0 0 2px var(--register-wash); cursor:text; }
+.pbox.deleted{
+  background:transparent; border:1px dashed var(--flag);
+}
+.pbox.deleted .pbox-text{ visibility:hidden; }
+.pbox-text{
+  width:100%; height:100%; outline:none; white-space:pre-wrap; word-break:break-word;
+  font-family:Georgia,"Times New Roman",serif; color:#14181D; /* fixed ink, not theme-reactive -- see .pbox */
+  cursor:text;
+}
+.pbox.deleted .pbox-restore{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:10px; color:var(--flag); background:none; border:none;
+}
+.run.flash{ animation:runflash .3s ease; }
+@keyframes runflash{ 0%,100%{ background:transparent; } 40%{ background:var(--register-wash); } }
+.pbox-grow{
+  position:absolute; left:0; right:0; top:100%;
+  border-top:1px dashed var(--rule); pointer-events:none;
+}
+.pbox-cap{
+  position:absolute; left:2px; top:100%; margin-top:2px;
+  font-family:var(--font-mono); font-size:9px; white-space:nowrap;
+  padding:1px 5px; border-radius:3px; pointer-events:none; z-index:2;
+}
+.pbox-cap.fits{ background:var(--ok-wash); color:var(--ok); }
+.pbox-cap.shrunk{ background:var(--flag-wash); color:var(--flag); }
+.pbox-cap.overflow{ background:var(--flag); color:#fff; }
+.pbox:not(:hover):not(.selected):not(.editing) .pbox-cap{ opacity:0; }
+.pbox-grip{
+  position:absolute; right:-4px; top:0; bottom:0; width:8px;
+  background:none; border:none; cursor:ew-resize; padding:0;
+  opacity:0;
+}
+.pbox.selected .pbox-grip, .pbox:hover .pbox-grip{ opacity:1; }
+.pbox-grip::after{ content:""; position:absolute; right:2px; top:50%; width:2px; height:16px; background:var(--register); transform:translateY(-50%); border-radius:1px; }
+
+/* ============================================================
+   PROTOTYPE STATE SWITCHER (dev-only chrome)
+   ============================================================ */
+.dev-switcher{
+  position:fixed; right:16px; bottom:16px; z-index:50;
+  background:var(--leaf-raised); border:1px solid var(--rule); border-radius:6px;
+  box-shadow:var(--shadow-card); font-family:var(--font-mono);
+}
+.dev-switcher-head{
+  display:flex; align-items:center; gap:8px; padding:9px 12px; cursor:pointer;
+  font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint);
+}
+.dev-switcher-body{ display:flex; gap:4px; padding:0 8px 8px; flex-wrap:wrap; max-width:280px; }
+.dev-switcher.collapsed .dev-switcher-body{ display:none; }
+.dev-btn{
+  padding:6px 9px; font-size:10.5px; border:1px solid var(--rule); border-radius:3px;
+  background:var(--leaf); color:var(--ink-soft);
+}
+.dev-btn.on{ background:var(--ink); color:var(--leaf); border-color:var(--ink); }
+.dev-theme{ padding:6px 9px; font-size:10.5px; border:1px solid var(--rule); border-radius:3px; background:var(--leaf); }
+
+/* ---- toast ---- */
+.toast{
+  position:fixed; left:50%; bottom:26px; z-index:60;
+  transform:translate(-50%,10px); opacity:0; pointer-events:none;
+  background:var(--ink); color:var(--leaf); font-family:var(--font-mono); font-size:12.5px;
+  padding:11px 18px; border-radius:6px; max-width:min(480px,86vw); text-align:center;
+  box-shadow:0 10px 30px -10px rgba(0,0,0,.4);
+  transition:opacity .2s ease, transform .2s ease;
+}
+.toast.show{ opacity:1; transform:translate(-50%,0); pointer-events:auto; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 900px){
+  .shell{ grid-template-columns: 1fr; grid-template-areas:"top" "stage"; }
+  .rail{
+    position:fixed; top:var(--topbar-h); left:0; bottom:0; width:min(340px,88vw);
+    transform:translateX(-100%); transition:transform .22s ease; z-index:40;
+    box-shadow:12px 0 30px -12px rgba(0,0,0,.3);
+  }
+  .rail.open{ transform:translateX(0); }
+  .rail-scrim{ position:fixed; inset:var(--topbar-h) 0 0 0; background:rgba(20,24,29,.35); z-index:35; display:none; }
+  .rail-scrim.show{ display:block; }
+  .rail-toggle{ display:grid; }
+  .hero, .state-pad{ padding-left:20px; padding-right:20px; }
+  .estimate-grid{ grid-template-columns:repeat(2,1fr); }
+}
+@media (max-width: 480px){
+  .stat-strip{ flex-wrap:wrap; }
+  .stat{ flex:1 1 45%; }
+  .page-base{ max-height:52vh; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <button class="icon-btn rail-toggle" id="railToggle" aria-label="Open settings">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+      <div class="brand">
+        <svg class="regmark" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="2.5" width="12" height="17" rx="1.1" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <g stroke="var(--under)" stroke-width="1.05" stroke-linecap="round">
+            <line x1="5.3" y1="6" x2="12.7" y2="6"/>
+            <line x1="5.3" y1="9" x2="11" y2="9"/>
+            <line x1="5.3" y1="12" x2="12.7" y2="12"/>
+            <line x1="5.3" y1="15" x2="9.5" y2="15"/>
+          </g>
+          <g class="m" fill="none" stroke-width="1.3"><circle cx="16.5" cy="17.5" r="3.1"/><line x1="16.5" y1="12.5" x2="16.5" y2="22.5"/><line x1="11.5" y1="17.5" x2="21.5" y2="17.5"/></g>
+          <g class="u" fill="none" stroke-width="1.3"><circle cx="16.5" cy="17.5" r="3.1"/><line x1="16.5" y1="12.5" x2="16.5" y2="22.5"/><line x1="11.5" y1="17.5" x2="21.5" y2="17.5"/></g>
+        </svg>
+        palimpsest
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="pill-select" id="backendPill">
+        <span class="dot on" id="backendDot"></span>
+        <span id="backendPillLabel">gemini</span>
+      </span>
+      <button class="icon-btn" id="themeToggle" aria-label="Toggle color theme" title="Toggle color theme">
+        <svg class="theme-icon" id="themeIcon" width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <defs>
+            <mask id="moonMask" maskUnits="userSpaceOnUse">
+              <rect x="0" y="0" width="16" height="16" fill="#fff"/>
+              <circle id="moonCut" cx="20" cy="-4" r="5.6" fill="#000"/>
+            </mask>
+          </defs>
+          <g class="theme-rays" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+            <line x1="8" y1="0.8" x2="8" y2="2.6"/>
+            <line x1="8" y1="13.4" x2="8" y2="15.2"/>
+            <line x1="15.2" y1="8" x2="13.4" y2="8"/>
+            <line x1="2.6" y1="8" x2="0.8" y2="8"/>
+            <line x1="13" y1="3" x2="11.7" y2="4.3"/>
+            <line x1="4.3" y1="11.7" x2="3" y2="13"/>
+            <line x1="13" y1="13" x2="11.7" y2="11.7"/>
+            <line x1="4.3" y1="4.3" x2="3" y2="3"/>
+          </g>
+          <circle class="theme-core" cx="8" cy="8" r="3.6" fill="currentColor" mask="url(#moonMask)"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="rail-scrim" id="railScrim"></div>
+
+  <button class="rail-reveal" id="railReveal" aria-label="Show settings sidebar" title="Show settings sidebar">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+
+  <!-- ============ LEFT RAIL ============ -->
+  <aside class="rail" id="rail">
+    <button class="rail-collapse-btn" id="railCollapse" aria-label="Hide settings sidebar" title="Hide settings sidebar">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <div class="rail-section">
+      <div class="rail-label">Backend</div>
+      <label class="radio-row active" data-backend="gemini">
+        <input type="radio" name="backend" value="gemini" checked>
+        <span><span class="rr-title"><span class="vendor-dot"></span>Gemini</span><br><span class="rr-sub">Free tier · needs a free API key</span></span>
+      </label>
+      <label class="radio-row" data-backend="anthropic">
+        <input type="radio" name="backend" value="anthropic">
+        <span><span class="rr-title"><span class="vendor-dot"></span>Claude</span><br><span class="rr-sub">Paid · best quality on legal &amp; financial prose</span></span>
+      </label>
+      <label class="radio-row" data-backend="google">
+        <input type="radio" name="backend" value="google">
+        <span><span class="rr-title"><span class="vendor-dot"></span>Google Translate</span><br><span class="rr-sub">Free · no key · no entity or glossary awareness</span></span>
+      </label>
+
+      <div id="keyField">
+        <div class="field">
+          <label for="apiKey">API key</label>
+          <div class="key-row">
+            <input class="input" type="password" id="apiKey" placeholder="AIza…" autocomplete="off">
+            <button class="btn-mini" id="checkKeyBtn">Check</button>
+          </div>
+          <div class="key-status" id="keyStatus"><span class="dot off"></span> Not checked yet</div>
+        </div>
+        <p class="help">Held for this browser session and sent to your own local server only — never written to disk, never sent anywhere but the backend you picked. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free Gemini key ↗</a></p>
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-label">Protected entities <span class="count" id="entityCount">3</span></div>
+      <div class="chip-groups" id="entityGroups">
+        <div>
+          <div class="chip-group-h">Companies</div>
+          <div class="chips" data-group="companies">
+            <span class="chip">Grupo Meridian, S.A.S. <button aria-label="Remove Grupo Meridian, S.A.S.">×</button></span>
+            <span class="chip">Banco Litoral, S.A. <button aria-label="Remove Banco Litoral, S.A.">×</button></span>
+          </div>
+        </div>
+        <div>
+          <div class="chip-group-h">People</div>
+          <div class="chips" data-group="people">
+            <span class="chip">Andrés Carreño <button aria-label="Remove Andrés Carreño">×</button></span>
+          </div>
+        </div>
+        <div>
+          <div class="chip-group-h">Places</div>
+          <div class="chips" data-group="places"></div>
+        </div>
+        <div>
+          <div class="chip-group-h">Other</div>
+          <div class="chips" data-group="other"></div>
+        </div>
+      </div>
+      <div class="add-row">
+        <input class="input" id="entityAdd" placeholder="Add a name, press Enter…">
+        <button class="btn-mini" id="entityAddBtn">Add</button>
+      </div>
+      <p class="help">Case and accent variants are generated for you — add <code>JMMB</code>, not <code>JMMB</code> and <code>jmmb</code> separately.</p>
+      <div class="rail-links">
+        <button id="importTomlBtn">Import .toml</button>
+        <button id="exportTomlBtn">Export .toml</button>
+      </div>
+    </div>
+
+    <div class="rail-section" id="suggestedSection" style="display:none;">
+      <div class="rail-label">Suggested, from the document</div>
+      <div class="chips">
+        <span class="chip suggested" data-add="Fideicomiso Aurora Plaza">+ Fideicomiso Aurora Plaza</span>
+        <span class="chip suggested" data-add="Lucía Fernández Roa">+ Lucía Fernández Roa</span>
+      </div>
+      <p class="help">Capitalized phrases found in the document that aren't protected yet. Nothing here is applied automatically.</p>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-label">Glossary</div>
+      <label class="check-row"><input type="checkbox" checked> legal</label>
+      <label class="check-row"><input type="checkbox"> ifrs</label>
+      <label class="check-row"><input type="checkbox"> construction</label>
+    </div>
+
+    <div class="rail-section">
+      <details class="adv">
+        <summary>Advanced</summary>
+        <div class="adv-body">
+          <div class="field" style="margin-top:0;">
+            <label for="pageRange">Page range</label>
+            <input class="input" id="pageRange" placeholder="all pages, or e.g. 1-5,11">
+          </div>
+          <div class="field">
+            <label for="minSize">Minimum scan text size (pt)</label>
+            <input class="input" id="minSize" type="number" value="7.0" step="0.5">
+            <p class="help">Lower this if a scanned document comes back mostly untranslated — some scans measure body text smaller than the default expects.</p>
+          </div>
+          <div class="field">
+            <label for="scanFont">Scan font family</label>
+            <select class="select" id="scanFont">
+              <option>Calibri</option>
+              <option>Georgia</option>
+              <option>Times New Roman</option>
+            </select>
+          </div>
+          <div class="toggle-row">
+            <label for="dualToggle" style="font-size:13px;">Also produce dual (bilingual) PDF</label>
+            <span class="switch"><input type="checkbox" id="dualToggle"><span class="track"></span><span class="knob"></span></span>
+          </div>
+          <div class="toggle-row">
+            <label for="forceToggle" style="font-size:13px;">Force re-run (ignore cache)</label>
+            <span class="switch"><input type="checkbox" id="forceToggle"><span class="track"></span><span class="knob"></span></span>
+          </div>
+        </div>
+      </details>
+    </div>
+  </aside>
+
+  <!-- ============ STAGE ============ -->
+  <main class="stage" id="stage">
+
+    <!-- OVERVIEW · landing -->
+    <section class="state active" data-state="overview">
+      <div class="state-pad overview-pad">
+        <div class="eyebrow">How it works</div>
+        <h1 class="stage-h1 overview-h1">Spanish documents, translated in place.</h1>
+        <p class="stage-sub overview-sub">palimpsest translates PDFs and Office files without rebuilding
+          them — same pages, same fonts, same artwork, only the words change. Anything you list as
+          protected, a company name, a person, an amount, stays exactly as written.</p>
+
+        <ol class="steps">
+          <li class="step">
+            <span class="step-n">1</span>
+            <span class="step-body"><strong>Pick a backend.</strong> Gemini's free tier needs only an
+              API key, no billing setup — see the sidebar.</span>
+          </li>
+          <li class="step">
+            <span class="step-n">2</span>
+            <span class="step-body"><strong>Name what must survive verbatim.</strong> Company names,
+              people, places — added once, protected everywhere.</span>
+          </li>
+          <li class="step">
+            <span class="step-n">3</span>
+            <span class="step-body"><strong>Drop a file.</strong> PDF, Word, PowerPoint, or Excel —
+              you get back a replica, plus an honest report of anything that didn't translate.</span>
+          </li>
+        </ol>
+
+        <div class="btn-row" style="margin-top:32px;">
+          <button class="btn" data-goto="sample">See a sample →</button>
+        </div>
+
+        <div class="dropzone overview-dropzone" id="dropzoneOverview">
+          <div class="dropzone-copy">
+            <div class="dz-title">Or drop a file here to start now</div>
+            <div class="dz-sub">.pdf · .docx · .pptx · .xlsx</div>
+          </div>
+          <button class="btn secondary" id="browseBtnOverview">Choose files</button>
+          <input type="file" id="fileInputOverview" multiple accept=".pdf,.docx,.pptx,.xlsx">
+        </div>
+      </div>
+    </section>
+
+    <!-- SAMPLE · document-dominant demo -->
+    <section class="state" data-state="sample">
+      <div class="hero">
+        <div class="page-stack" id="wipe" data-mode="compare" style="--wipe-pct:50%;" tabindex="0" role="slider" aria-label="Compare original and translated page" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+          <img class="page-base" src="sample/output.png" alt="Translated sample page (English)">
+          <img class="page-wipe" src="sample/source.png" alt="Original sample page (Spanish)">
+          <span class="wipe-label src">source</span>
+          <span class="wipe-label out">translated</span>
+          <div class="wipe-divider"><div class="wipe-handle">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 3L1 8l4 5M11 3l4 5-4 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div></div>
+        </div>
+        <p class="wipe-note">drag, or use ← → — Aurora Plaza Trust, sample deed, 1 of 1</p>
+
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone-copy">
+            <div class="dz-title">Drop files here, or click to browse</div>
+            <div class="dz-sub">.pdf · .docx · .pptx · .xlsx — dropped anywhere on this page</div>
+          </div>
+          <button class="btn" id="browseBtn">Choose files</button>
+          <input type="file" id="fileInput" multiple accept=".pdf,.docx,.pptx,.xlsx">
+        </div>
+      </div>
+    </section>
+
+    <!-- B · QUEUE -->
+    <section class="state" data-state="queue">
+      <div class="state-pad">
+        <div class="eyebrow">Step 1 of 3</div>
+        <h1 class="stage-h1">Queue</h1>
+        <p class="stage-sub">Classified before anything is sent anywhere — a scan means an OCR pass, which is the slow part.</p>
+
+        <div class="file-list">
+          <div class="file-row">
+            <div class="file-icon">PDF</div>
+            <div class="file-meta">
+              <div class="file-name">trust-deed-aurora.pdf</div>
+              <div class="file-sub">
+                <span class="badge digital">digital</span>
+                <span>812 KB</span><span>4 pages</span>
+              </div>
+            </div>
+            <button class="file-remove" aria-label="Remove trust-deed-aurora.pdf">✕</button>
+          </div>
+          <div class="file-row">
+            <div class="file-icon">PDF</div>
+            <div class="file-meta">
+              <div class="file-name">financial-statement-2026.pdf</div>
+              <div class="file-sub">
+                <span class="badge scan">scan</span>
+                <span>2.1 MB</span><span>12 pages</span>
+              </div>
+            </div>
+            <button class="file-remove" aria-label="Remove financial-statement-2026.pdf">✕</button>
+          </div>
+        </div>
+
+        <div class="scan-warn">
+          <span>⚠</span>
+          <span><strong>financial-statement-2026.pdf</strong> is a scan — it needs OCR before translation, which runs as an external process and can take several minutes with no way to interrupt it once started.</span>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn secondary" data-goto="sample">← Back</button>
+          <button class="btn" data-goto="estimate">Estimate cost →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- C · ESTIMATE -->
+    <section class="state" data-state="estimate">
+      <div class="state-pad">
+        <div class="eyebrow">Step 2 of 3</div>
+        <h1 class="stage-h1">Before anything is spent</h1>
+        <p class="stage-sub">Nothing is sent to a translation backend until you confirm here.</p>
+
+        <div class="estimate-grid">
+          <div class="estimate-cell">
+            <div class="ec-label">Paragraphs</div>
+            <div class="ec-value">172</div>
+            <div class="ec-sub">154 unique strings</div>
+          </div>
+          <div class="estimate-cell">
+            <div class="ec-label">Cache hits</div>
+            <div class="ec-value">0<span style="font-size:15px;color:var(--ink-faint);">/154</span></div>
+            <div class="ec-sub">0% — first run of this document</div>
+            <div class="cache-bar"><span style="width:0%;"></span></div>
+          </div>
+          <div class="estimate-cell">
+            <div class="ec-label">Tokens (est.)</div>
+            <div class="ec-value" style="font-size:19px;">48.3k <span style="font-size:12px;color:var(--ink-faint);">in</span> / 48.3k <span style="font-size:12px;color:var(--ink-faint);">out</span></div>
+            <div class="ec-sub">gemini-3.5-flash-lite</div>
+          </div>
+          <div class="estimate-cell">
+            <div class="ec-label">Cost</div>
+            <div class="ec-value money">~$0.42</div>
+            <div class="ec-sub">estimated, not exact</div>
+          </div>
+        </div>
+
+        <p class="help" style="margin-top:14px;">Cost shown as unknown, not $0.00, whenever the backend can't price the request — Google Translate is free by design, not free by omission.</p>
+
+        <div class="btn-row">
+          <button class="btn secondary" data-goto="queue">← Back</button>
+          <button class="btn" id="runTranslateBtn">Translate 2 documents →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- D · RUNNING -->
+    <section class="state" data-state="running">
+      <div class="state-pad">
+        <div class="eyebrow">Step 3 of 3</div>
+        <h1 class="stage-h1">Running</h1>
+        <p class="stage-sub" id="runningFileLabel">trust-deed-aurora.pdf</p>
+
+        <div class="phase-rail" id="phaseRail">
+          <div class="phase done" data-phase="classify">
+            <div class="phase-icon">✓</div>
+            <div class="phase-body">
+              <div class="phase-name">Classify</div>
+              <div class="phase-detail">digital text layer found</div>
+            </div>
+          </div>
+          <div class="phase done" data-phase="ocr">
+            <div class="phase-icon">✓</div>
+            <div class="phase-body">
+              <div class="phase-name">OCR</div>
+              <div class="phase-detail">skipped — not a scan</div>
+            </div>
+          </div>
+          <div class="phase done" data-phase="extract">
+            <div class="phase-icon">✓</div>
+            <div class="phase-body">
+              <div class="phase-name">Extract</div>
+              <div class="phase-detail">172 paragraphs found across 4 pages</div>
+            </div>
+          </div>
+          <div class="phase active" data-phase="translate">
+            <div class="phase-icon">⟳</div>
+            <div class="phase-body">
+              <div class="phase-name">Translate</div>
+              <div class="phase-detail"><span id="translateCount">87</span> of 154 unique strings</div>
+              <div class="phase-bar"><span id="translateBar" style="width:56%;"></span></div>
+            </div>
+          </div>
+          <div class="phase pending" data-phase="render">
+            <div class="phase-icon">3</div>
+            <div class="phase-body">
+              <div class="phase-name">Render</div>
+              <div class="phase-detail">waiting</div>
+            </div>
+          </div>
+          <div class="phase pending" data-phase="save">
+            <div class="phase-icon">4</div>
+            <div class="phase-body">
+              <div class="phase-name">Save</div>
+              <div class="phase-detail">waiting</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="run-summary">
+          <span class="run-progress-num" id="runOverall">document 1 of 2 · 56% of this document</span>
+          <button class="btn danger" id="cancelBtn">Cancel</button>
+        </div>
+        <p class="cancel-note">Cancelling abandons the result — an in-flight OCR or translation call can't be interrupted mid-request, only left to finish and discarded.</p>
+      </div>
+    </section>
+
+    <!-- E · RESULTS -->
+    <section class="state" data-state="results">
+      <div class="state-pad results-panel">
+        <div class="results-head">
+          <div>
+            <div class="eyebrow">trust-deed-aurora.pdf → trust-deed-aurora.en.pdf</div>
+            <h1 class="results-headline"><span class="frac">154</span> of 172 paragraphs translated.</h1>
+          </div>
+          <button class="btn secondary" data-goto="sample">New translation</button>
+        </div>
+
+        <div class="stat-strip">
+          <div class="stat ok"><div class="s-n">154</div><div class="s-l">Translated</div></div>
+          <div class="stat skip"><div class="s-n">18</div><div class="s-l">Kept Spanish · protected</div></div>
+          <div class="stat fail"><div class="s-n">3</div><div class="s-l">Failed</div></div>
+          <div class="stat fail"><div class="s-n">1</div><div class="s-l">Refused</div></div>
+          <div class="stat skip"><div class="s-n">2</div><div class="s-l">Identical</div></div>
+        </div>
+
+        <div class="section-h"><h2>What didn't translate</h2></div>
+        <div>
+          <div class="issue-row">
+            <span class="status-tag failed">failed</span>
+            <div class="issue-body">
+              <div class="issue-text">"El fideicomitente podrá revocar el presente instrumento únicamente…"</div>
+              <div class="issue-page">page 2 · entity/number assertion failed twice</div>
+            </div>
+            <button class="issue-jump" data-page="2">View on page →</button>
+          </div>
+          <div class="issue-row">
+            <span class="status-tag refused">refused</span>
+            <div class="issue-body">
+              <div class="issue-text">"…en caso de fallecimiento del apoderado antes de la firma…"</div>
+              <div class="issue-page">page 3 · model declined to answer</div>
+            </div>
+            <button class="issue-jump" data-page="3">View on page →</button>
+          </div>
+          <div class="issue-row">
+            <span class="status-tag failed">failed</span>
+            <div class="issue-body">
+              <div class="issue-text">"RD$48,750,000.00 según consta en el Anexo B, cláusula 4.2…"</div>
+              <div class="issue-page">page 1 · digit-sequence mismatch after retry</div>
+            </div>
+            <button class="issue-jump" data-page="1">View on page →</button>
+          </div>
+          <div class="issue-row">
+            <span class="status-tag skipped">skipped · protected</span>
+            <div class="issue-body">
+              <div class="issue-text">"GRUPO MERIDIAN, S.A.S."</div>
+              <div class="issue-page">page 1 · matches a protected entity, left untouched by design</div>
+            </div>
+            <button class="issue-jump" data-page="1">View on page →</button>
+          </div>
+        </div>
+
+        <div class="section-h"><h2>Font substitutions</h2></div>
+        <div class="subs-box">
+          <div class="subs-row"><span>Baskerville Old Face</span><span class="arrow">→</span><span>Georgia</span><span style="color:var(--ink-faint);">· 3 paragraphs</span></div>
+        </div>
+
+        <div class="download-row">
+          <button class="download-card" data-download="trust-deed-aurora.en.pdf"><span class="dl-icon">PDF</span><span><span class="dl-title">Replica</span><br><span class="dl-sub">trust-deed-aurora.en.pdf</span></span></button>
+          <button class="download-card" data-download="trust-deed-aurora.dual.pdf"><span class="dl-icon">2×</span><span><span class="dl-title">Dual PDF</span><br><span class="dl-sub">source + translated, interleaved</span></span></button>
+          <button class="download-card" data-download="trust-deed-aurora.report.json"><span class="dl-icon">{ }</span><span><span class="dl-title">Report</span><br><span class="dl-sub">trust-deed-aurora.report.json</span></span></button>
+        </div>
+      </div>
+
+      <!-- compare overlay, reached via "View on page" -->
+      <div class="state-pad compare-view" id="compareView">
+        <div class="compare-topline">
+          <button class="btn secondary" id="backToResults">← Back to results</button>
+          <div class="page-nav">
+            <button id="pagePrev" aria-label="Previous page">‹</button>
+            <span>page <span id="pageNum">1</span> of 4</span>
+            <button id="pageNext" aria-label="Next page">›</button>
+          </div>
+          <div class="mode-switch" role="radiogroup" aria-label="View mode">
+            <button class="mode-btn active" id="modeCompareBtn" role="radio" aria-checked="true">Compare</button>
+            <button class="mode-btn" id="modeEditBtn" role="radio" aria-checked="false">Edit</button>
+          </div>
+        </div>
+
+        <!-- Edit toolbar: docked, not a floating selection popup -- a popup
+             that appears on text selection would imply selection-scoped
+             formatting, which the renderer cannot do (see the note below). -->
+        <div class="edit-toolbar" id="editToolbar" hidden role="toolbar" aria-label="Paragraph formatting">
+          <span class="et-target" id="etTarget">No paragraph selected</span>
+          <span class="et-group">
+            <button class="et-btn" id="etBold" data-fmt="bold" disabled aria-label="Bold phrase" title="Bold phrase (Ctrl+B)"><strong>B</strong></button>
+            <button class="et-btn" id="etItalic" data-fmt="italic" disabled aria-label="Italic phrase" title="Italic phrase (Ctrl+I)"><em>I</em></button>
+            <button class="et-btn" id="etUnderline" data-fmt="underline" disabled aria-label="Underline phrase" title="Underline phrase (Ctrl+U)"><span style="text-decoration:underline;">U</span></button>
+            <button class="et-btn" id="etHighlight" data-fmt="highlight" disabled aria-label="Highlight phrase" title="Highlight phrase"><span style="background:#FFE58A;padding:0 2px;">H</span></button>
+          </span>
+          <span class="et-group" id="etColors" aria-label="Text colour"></span>
+          <span class="et-group" id="etAlign">
+            <button class="et-btn" data-align="left" disabled aria-label="Align left" title="Align left">⇤</button>
+            <button class="et-btn" data-align="center" disabled aria-label="Align center" title="Align center">≡</button>
+            <button class="et-btn" data-align="right" disabled aria-label="Align right" title="Align right">⇥</button>
+            <button class="et-btn" data-align="justify" disabled aria-label="Justify" title="Justify">☰</button>
+          </span>
+          <span class="et-group">
+            <button class="et-btn" id="etDelete" disabled aria-label="Delete paragraph" title="Delete paragraph (Delete)">🗑</button>
+          </span>
+          <span class="et-spacer"></span>
+          <span class="et-cap" id="etCap"></span>
+        </div>
+        <p class="edit-note" id="editNote" hidden>Emphasis applies to the whole phrase, not your selection — the PDF stores styling per phrase, not per character. <a href="../../docs/design/limitations.md" target="_blank" rel="noopener">Why ↗</a></p>
+
+        <div class="page-stack" id="wipe2" data-mode="compare" style="--wipe-pct:50%;" tabindex="0" role="slider" aria-label="Compare original and translated page" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+          <img class="page-base" id="wipe2Base" src="sample/output.png" alt="Translated page">
+          <img class="page-wipe" id="wipe2Wipe" src="sample/source.png" alt="Original page">
+          <span class="wipe-label src">source</span>
+          <span class="wipe-label out">translated</span>
+          <div class="wipe-divider"><div class="wipe-handle">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 3L1 8l4 5M11 3l4 5-4 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div></div>
+          <div class="edit-layer" id="editLayer" hidden></div>
+        </div>
+
+        <div class="edit-footer" id="editFooter" hidden>
+          <span class="edit-status" id="editStatus">No unsaved edits</span>
+          <span class="edit-actions">
+            <button class="btn-mini" id="editUndo" disabled>Undo</button>
+            <button class="btn-mini" id="editDiscard" disabled>Discard edits</button>
+            <button class="btn-mini" id="editExport">Download edits (JSON)</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="sample/layout.js"></script>
+
+<!-- ============ PROTOTYPE STATE SWITCHER (dev-only) ============ -->
+<div class="dev-switcher collapsed" id="devSwitcher">
+  <div class="dev-switcher-head" id="devSwitcherHead">
+    <span>prototype states</span>
+    <span id="devSwitcherArrow">▸</span>
+  </div>
+  <div class="dev-switcher-body">
+    <button class="dev-btn on" data-goto="overview">1 · overview</button>
+    <button class="dev-btn" data-goto="sample">2 · sample</button>
+    <button class="dev-btn" data-goto="queue">3 · queue</button>
+    <button class="dev-btn" data-goto="estimate">4 · estimate</button>
+    <button class="dev-btn" data-goto="running">5 · running</button>
+    <button class="dev-btn" data-goto="results">6 · results</button>
+    <button class="dev-theme" id="devThemeBtn">◐ theme</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let toastTimer = null;
+  window.toast = function(msg){
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
+  };
+
+  /* ---------------- state machine ---------------- */
+  const states = document.querySelectorAll(".state");
+  const devBtns = document.querySelectorAll(".dev-btn[data-goto]");
+
+  function goto(name, opts){
+    opts = opts || {};
+    states.forEach(s => s.classList.toggle("active", s.dataset.state === name));
+    devBtns.forEach(b => b.classList.toggle("on", b.dataset.goto === name));
+    document.getElementById("compareView").classList.remove("active");
+    const resultsPanel = document.querySelector(".results-panel");
+    if(resultsPanel) resultsPanel.style.display = "";
+    document.getElementById("suggestedSection").style.display =
+      (name !== "overview" && name !== "sample") ? "" : "none";
+    if(name === "running") startRunningDemo(opts.animate === true);
+    document.getElementById("stage").scrollTop = 0;
+    window.scrollTo(0,0);
+  }
+  document.querySelectorAll("[data-goto]").forEach(el => {
+    el.addEventListener("click", () => goto(el.dataset.goto));
+  });
+  // The one real "golden path" trigger: only this button animates the
+  // translate progress and auto-advances to Results. Every other route to
+  // "running" (the dev switcher, back-and-forward) shows the static
+  // mid-progress snapshot already baked into the markup, so a reviewer can
+  // inspect the state without it disappearing after a few seconds.
+  document.getElementById("runTranslateBtn").addEventListener("click", () => {
+    goto("running", {animate: true});
+  });
+
+  /* ---------------- dev switcher collapse ---------------- */
+  const devSwitcher = document.getElementById("devSwitcher");
+  document.getElementById("devSwitcherHead").addEventListener("click", () => {
+    devSwitcher.classList.toggle("collapsed");
+    document.getElementById("devSwitcherArrow").textContent = devSwitcher.classList.contains("collapsed") ? "▸" : "▾";
+  });
+
+  /* ---------------- theme toggle ---------------- */
+  function effectiveTheme(){
+    const explicit = document.documentElement.getAttribute("data-theme");
+    if(explicit) return explicit;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function setTheme(t){
+    if(t){ document.documentElement.setAttribute("data-theme", t); }
+    else{ document.documentElement.removeAttribute("data-theme"); }
+    document.getElementById("themeIcon").dataset.icon = effectiveTheme();
+  }
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    setTheme(effectiveTheme() === "dark" ? "light" : "dark");
+  });
+  document.getElementById("devThemeBtn").addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    setTheme(cur === "dark" ? "light" : (cur === "light" ? null : "dark"));
+  });
+  // Icon must match the effective theme on first paint too (system dark,
+  // no explicit override yet) -- not just after the first click.
+  document.getElementById("themeIcon").dataset.icon = effectiveTheme();
+
+  /* ---------------- mobile rail (drawer) ---------------- */
+  const rail = document.getElementById("rail");
+  const scrim = document.getElementById("railScrim");
+  function openRail(){ rail.classList.add("open"); scrim.classList.add("show"); }
+  function closeRail(){ rail.classList.remove("open"); scrim.classList.remove("show"); }
+  document.getElementById("railToggle").addEventListener("click", openRail);
+  scrim.addEventListener("click", closeRail);
+
+  /* ---------------- desktop rail (collapse) ---------------- */
+  // Independent of the drawer above -- the two only apply at disjoint
+  // viewport widths (see the >900px media query on .rail-collapse-btn),
+  // so there is no state to keep in sync between them.
+  const shellEl = document.querySelector(".shell");
+  const RAIL_COLLAPSE_KEY = "pp-rail-collapsed";
+  function setRailCollapsed(collapsed){
+    shellEl.classList.toggle("rail-collapsed", collapsed);
+    localStorage.setItem(RAIL_COLLAPSE_KEY, collapsed ? "1" : "0");
+  }
+  document.getElementById("railCollapse").addEventListener("click", () => setRailCollapsed(true));
+  document.getElementById("railReveal").addEventListener("click", () => setRailCollapsed(false));
+  setRailCollapsed(localStorage.getItem(RAIL_COLLAPSE_KEY) === "1");
+
+  /* ---------------- backend selection ---------------- */
+  const backendCopy = {
+    gemini:   {label:"gemini",    key:true},
+    anthropic:{label:"claude",    key:true},
+    google:   {label:"google mt", key:false},
+  };
+  document.querySelectorAll('input[name="backend"]').forEach(r => {
+    r.addEventListener("change", () => {
+      document.querySelectorAll(".radio-row").forEach(row => row.classList.toggle("active", row.dataset.backend === r.value));
+      const c = backendCopy[r.value];
+      document.getElementById("backendPillLabel").textContent = c.label;
+      document.getElementById("keyField").style.display = c.key ? "" : "none";
+      const dot = document.getElementById("backendDot");
+      dot.className = "dot " + (c.key ? "off" : "on");
+      document.getElementById("keyStatus").innerHTML = c.key
+        ? '<span class="dot off"></span> Not checked yet'
+        : '<span class="dot on"></span> No key needed';
+    });
+  });
+
+  /* ---------------- API key check (mock) ---------------- */
+  document.getElementById("checkKeyBtn").addEventListener("click", () => {
+    const val = document.getElementById("apiKey").value.trim();
+    const status = document.getElementById("keyStatus");
+    const dot = document.getElementById("backendDot");
+    if(!val){
+      status.innerHTML = '<span class="dot warn"></span> Enter a key first';
+      return;
+    }
+    status.innerHTML = '<span class="dot off"></span> Checking…';
+    setTimeout(() => {
+      status.innerHTML = '<span class="dot on"></span> Key works — gemini-3.5-flash-lite reachable';
+      dot.className = "dot on";
+    }, 650);
+  });
+
+  /* ---------------- protected entities ---------------- */
+  function entityCount(){
+    return document.querySelectorAll(".chips .chip:not(.suggested)").length;
+  }
+  function refreshCount(){
+    document.getElementById("entityCount").textContent = entityCount();
+  }
+  function addEntity(text, group){
+    if(!text.trim()) return;
+    group = group || "other";
+    const list = document.querySelector('.chips[data-group="' + group + '"]');
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.innerHTML = text.replace(/</g,"&lt;") + ' <button aria-label="Remove ' + text.replace(/"/g,"") + '">×</button>';
+    chip.querySelector("button").addEventListener("click", () => { chip.remove(); refreshCount(); });
+    list.appendChild(chip);
+    refreshCount();
+  }
+  document.querySelectorAll(".chips .chip button").forEach(b => {
+    b.addEventListener("click", (e) => { e.target.closest(".chip").remove(); refreshCount(); });
+  });
+  document.getElementById("entityAddBtn").addEventListener("click", () => {
+    addEntity(document.getElementById("entityAdd").value, "other");
+    document.getElementById("entityAdd").value = "";
+  });
+  document.getElementById("entityAdd").addEventListener("keydown", (e) => {
+    if(e.key === "Enter"){ e.preventDefault(); document.getElementById("entityAddBtn").click(); }
+  });
+  document.querySelectorAll(".chip.suggested").forEach(chip => {
+    chip.addEventListener("click", () => {
+      addEntity(chip.dataset.add, "other");
+      chip.remove();
+    });
+  });
+  document.getElementById("exportTomlBtn").addEventListener("click", () => {
+    const groups = {companies:[],people:[],places:[],other:[]};
+    document.querySelectorAll(".chips").forEach(list => {
+      const g = list.dataset.group;
+      list.querySelectorAll(".chip:not(.suggested)").forEach(c => {
+        groups[g].push(c.textContent.replace("×","").trim());
+      });
+    });
+    let toml = "[entities]\n";
+    for(const g of ["companies","people","places","other"]){
+      toml += g + " = [" + groups[g].map(v => JSON.stringify(v)).join(", ") + "]\n";
+    }
+    const blob = new Blob([toml], {type:"text/plain"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "entities.toml";
+    a.click();
+  });
+  document.getElementById("importTomlBtn").addEventListener("click", () => {
+    toast("Prototype only — the real build parses a dropped .toml in the same shape as private/entities.toml.");
+  });
+  document.querySelectorAll("[data-download]").forEach(btn => {
+    btn.addEventListener("click", () => toast("Prototype only — would download " + btn.dataset.download));
+  });
+  refreshCount();
+
+  /* ---------------- drop zones (Overview and Sample both have one) ---------------- */
+  function wireDropzone(dropzone, browseBtn, fileInput){
+    browseBtn.addEventListener("click", () => fileInput.click());
+    ["dragenter","dragover"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add("dragover"); }));
+    ["dragleave","drop"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove("dragover"); }));
+    dropzone.addEventListener("drop", () => goto("queue"));
+    fileInput.addEventListener("change", () => { if(fileInput.files.length) goto("queue"); });
+  }
+  wireDropzone(
+    document.getElementById("dropzone"),
+    document.getElementById("browseBtn"),
+    document.getElementById("fileInput"),
+  );
+  wireDropzone(
+    document.getElementById("dropzoneOverview"),
+    document.getElementById("browseBtnOverview"),
+    document.getElementById("fileInputOverview"),
+  );
+  // On the Sample screen, dropping onto the document itself also counts,
+  // not just the slim dropzone bar beneath it.
+  const wipeHero = document.getElementById("wipe");
+  ["dragover"].forEach(ev => wipeHero.addEventListener(ev, e => e.preventDefault()));
+  wipeHero.addEventListener("drop", (e) => { e.preventDefault(); goto("queue"); });
+
+  /* ---------------- wipe divider (drag + keyboard) ---------------- */
+  function initWipe(el){
+    let dragging = false;
+    // Compare and Edit are mutually exclusive modes of the same surface
+    // (#wipe2 only -- #wipe, the Sample-screen hero, never leaves
+    // data-mode="compare"). Gating every handler here, rather than
+    // adding/removing listeners when the mode switches, keeps the
+    // on/off logic in one place with no listener-leak class of bug.
+    function inEditMode(){ return el.dataset.mode === "edit"; }
+    function setPct(pct){
+      pct = Math.max(0, Math.min(100, pct));
+      el.style.setProperty("--wipe-pct", pct + "%");
+      el.setAttribute("aria-valuenow", Math.round(pct));
+    }
+    function fromClientX(clientX){
+      const r = el.getBoundingClientRect();
+      return ((clientX - r.left) / r.width) * 100;
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if(inEditMode()) return;
+      dragging = true; el.setPointerCapture(e.pointerId);
+      el.classList.add("no-drift");
+      setPct(fromClientX(e.clientX));
+    });
+    el.addEventListener("pointermove", (e) => { if(dragging && !inEditMode()) setPct(fromClientX(e.clientX)); });
+    el.addEventListener("pointerup", () => dragging = false);
+    el.addEventListener("pointercancel", () => dragging = false);
+    el.addEventListener("keydown", (e) => {
+      if(inEditMode()) return; // arrows must reach the caret / box nav instead
+      const cur = parseFloat(getComputedStyle(el).getPropertyValue("--wipe-pct")) || 50;
+      if(e.key === "ArrowLeft"){ setPct(cur - 4); e.preventDefault(); el.dataset.userSet = "1"; }
+      if(e.key === "ArrowRight"){ setPct(cur + 4); e.preventDefault(); el.dataset.userSet = "1"; }
+    });
+    el.addEventListener("pointerdown", () => { if(!inEditMode()) el.dataset.userSet = "1"; });
+    return setPct;
+  }
+  const setWipe1 = initWipe(document.getElementById("wipe"));
+  const setWipe2 = initWipe(document.getElementById("wipe2"));
+
+  /* Sample-state ambient drift */
+  if(!reduceMotion){
+    let t = 0, dir = 1;
+    setInterval(() => {
+      const wipe = document.getElementById("wipe");
+      if(!wipe.closest(".state").classList.contains("active")) return;
+      if(wipe.dataset.userSet) return;
+      t += dir * 0.35;
+      if(t > 66 || t < 34) dir *= -1;
+      setWipe1(50 + t);
+    }, 60);
+  }
+
+  /* ---------------- compare overlay from Results ---------------- */
+  document.querySelectorAll(".issue-jump").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelector(".results-panel").style.display = "none";
+      document.getElementById("compareView").classList.add("active");
+      document.getElementById("pageNum").textContent = btn.dataset.page;
+      if(window.__ppResetToCompareMode) window.__ppResetToCompareMode();
+    });
+  });
+  document.getElementById("backToResults").addEventListener("click", () => {
+    document.getElementById("compareView").classList.remove("active");
+    document.querySelector(".results-panel").style.display = "";
+    if(window.__ppResetToCompareMode) window.__ppResetToCompareMode();
+  });
+  let curPage = 1;
+  function setPage(n){
+    curPage = Math.max(1, Math.min(4, n));
+    document.getElementById("pageNum").textContent = curPage;
+  }
+  document.getElementById("pagePrev").addEventListener("click", () => setPage(curPage - 1));
+  document.getElementById("pageNext").addEventListener("click", () => setPage(curPage + 1));
+
+  /* ============================================================
+     EDIT MODE
+     Reachable only from Results -> View on page: editing implies a job,
+     and the Sample screen (#wipe) has none. Everything here operates on
+     #wipe2 only.
+
+     PP_LAYOUT is the fixture generate.py emits by running the REAL
+     extractor (extract_paragraphs + page_to_ir) over the sample page --
+     not hand-built -- so registration against the raster is exact and
+     the paragraph shapes match what production actually produces. See
+     sample/generate.py's module docstring.
+     ============================================================ */
+  (function initEditMode(){
+    if(!window.PP_LAYOUT){
+      console.warn("PP_LAYOUT missing -- sample/layout.js did not load; edit mode stays off.");
+      return;
+    }
+    const LAYOUT = window.PP_LAYOUT;
+    const pageIr = LAYOUT.pages[0];
+    const renderInfo = LAYOUT.render.pages[0];
+    const ZOOM = LAYOUT.render.zoom;
+    const PT_W = renderInfo.px_width / ZOOM;   // page width in PDF points, derived from the
+    const PT_H = renderInfo.px_height / ZOOM;  // raster, not page.width/height -- see B2: the
+                                                // raster is what's actually on screen.
+
+    const stack = document.getElementById("wipe2");
+    const editLayer = document.getElementById("editLayer");
+    const toolbar = document.getElementById("editToolbar");
+    const editNote = document.getElementById("editNote");
+    const editFooter = document.getElementById("editFooter");
+    const editStatus = document.getElementById("editStatus");
+    const modeCompareBtn = document.getElementById("modeCompareBtn");
+    const modeEditBtn = document.getElementById("modeEditBtn");
+    const wipeSourceLayer = document.getElementById("wipe2Wipe");
+
+    // Firefox < 136 lacks contenteditable="plaintext-only". Feature-probe
+    // once; the fallback (contenteditable="true" + paste/beforeinput
+    // interception) still refuses rich formatting, just via a different
+    // mechanism -- never document.execCommand, which applies formatting
+    // to the selection, exactly the model this project refuses (see B3).
+    const supportsPlaintextOnly = (() => {
+      const probe = document.createElement("div");
+      try{ probe.contentEditable = "plaintext-only"; return probe.contentEditable === "plaintext-only"; }
+      catch(e){ return false; }
+    })();
+
+    /* ---------------- edit state ---------------- */
+    // key -> {op, rect:{x0,y0,x1,y1}, origin:[x,y], align, size, leading,
+    //         runs:[{text,font,size,bold,italic,color,underline,highlight}]}
+    const EDIT = new Map();
+    let selectedKey = null;
+    let editingKey = null;
+    const undoStack = []; // [{key, before: box-shape}]
+    let unsavedCount = 0;
+
+    function paraKey(i){ return "0:" + i; } // page:index -- becomes ir.Paragraph.id once that field exists (Part C)
+
+    function cloneBox(b){
+      return {
+        key: b.key, op: b.op,
+        rect: {...b.rect}, origin: b.origin.slice(), align: b.align,
+        size: b.size, leading: b.leading, font: b.font,
+        runs: b.runs.map(r => ({...r, color: r.color.slice(), highlight: r.highlight ? r.highlight.slice() : null})),
+      };
+    }
+    function initialBoxState(p, i){
+      return {
+        key: paraKey(i), op: "kept",
+        rect: {...p.rect}, origin: p.origin.slice(), align: p.align,
+        size: p.size, leading: p.leading, font: p.font,
+        runs: p.runs.map(r => ({
+          text: r.text, font: r.font, size: r.size, bold: r.bold, italic: r.italic,
+          color: r.color.slice(), underline: false, highlight: null,
+        })),
+      };
+    }
+    function getBox(key){
+      if(!EDIT.has(key)){
+        const i = Number(key.split(":")[1]);
+        EDIT.set(key, initialBoxState(pageIr.paragraphs[i], i));
+      }
+      return EDIT.get(key);
+    }
+    function pushUndo(key){
+      undoStack.push({key, before: cloneBox(getBox(key))});
+      if(undoStack.length > 100) undoStack.shift();
+      refreshEditFooter();
+    }
+    function markModified(key){
+      const box = getBox(key);
+      if(box.op === "kept") box.op = "modified";
+      refreshEditFooter();
+    }
+    function refreshEditFooter(){
+      unsavedCount = [...EDIT.values()].filter(b => b.op !== "kept").length;
+      editStatus.textContent = unsavedCount ? `${unsavedCount} unsaved edit${unsavedCount===1?"":"s"}` : "No unsaved edits";
+      document.getElementById("editUndo").disabled = undoStack.length === 0;
+      document.getElementById("editDiscard").disabled = unsavedCount === 0;
+    }
+
+    /* ---------------- coordinate mapping (points -> %) ---------------- */
+    // Percent, not px: resolves against the wrapper, which IS the image
+    // box (see the .page-stack comment in <style>), so resize/zoom/DPR
+    // are all free -- a missed resize event costs nothing, instead of
+    // misplacing every box.
+    function pctRect(rect){
+      return {
+        left:   100 * (rect.x0 * ZOOM) / renderInfo.px_width,
+        top:    100 * (rect.y0 * ZOOM) / renderInfo.px_height,
+        width:  100 * ((rect.x1 - rect.x0) * ZOOM) / renderInfo.px_width,
+        height: 100 * ((rect.y1 - rect.y0) * ZOOM) / renderInfo.px_height,
+      };
+    }
+    // Typography can't be a percentage, so one JS-computed scale (px per
+    // PDF point), refreshed by a single ResizeObserver -- if it misfires,
+    // text is the wrong size in a correctly-placed box: degraded, not
+    // broken, which is why this is split from the CSS-only geometry above.
+    function updateScale(){
+      const w = stack.getBoundingClientRect().width;
+      if(w > 0) stack.style.setProperty("--pp-scale", w / PT_W);
+    }
+    new ResizeObserver(updateScale).observe(stack);
+
+    function rgbCss(c){ return `rgb(${Math.round(c[0]*255)}, ${Math.round(c[1]*255)}, ${Math.round(c[2]*255)})`; }
+
+    /* ---------------- capacity: available_rect + fit_paragraph, ported ---------------- */
+    // A measurement probe in CSS "pt" units -- the same unit PDF points
+    // use -- so line-wrap estimates need no px/pt conversion at all,
+    // independent of the page's current display scale.
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute; left:-9999px; top:0; visibility:hidden; white-space:pre-wrap; word-break:break-word; font-family:Georgia,'Times New Roman',serif;";
+    document.body.appendChild(probe);
+
+    function overlapsX(a, b){ return a.x0 < b.x1 && b.x0 < a.x1; }
+
+    // Port of layout.available_rect: grows a paragraph's own rect
+    // downward, bounded by the page bottom margin or any paragraph below
+    // it that overlaps horizontally. `18` matches the library's own
+    // default bottom_margin. Estimate only -- see the tooltip on every cap chip.
+    function availableY1(box, allBoxes){
+      let limit = PT_H - 18;
+      for(const other of allBoxes){
+        if(other.key === box.key || other.op === "deleted") continue;
+        if(other.rect.y0 > box.rect.y0 && overlapsX(box.rect, other.rect)){
+          limit = Math.min(limit, other.rect.y0 - 1.0);
+        }
+      }
+      return limit;
+    }
+    // Port of render.fit_paragraph's shrink loop: 0.25pt steps down to a
+    // floor of size*0.72 (the library's own min_scale default), stopping
+    // at the first size whose wrapped height fits -- or giving up and
+    // reporting overflow, exactly like the server does (it draws anyway).
+    function fitInfo(box, availY1){
+      const maxHeight = availY1 - box.origin[1] + box.size;
+      const text = box.runs.map(r => r.text).join("");
+      const floor = box.size * 0.72;
+      let size = box.size;
+      while(true){
+        const lead = (box.leading || box.size * 1.18) * (size / box.size);
+        probe.style.width = (box.rect.x1 - box.rect.x0) + "pt";
+        probe.style.fontSize = size + "pt";
+        probe.style.lineHeight = lead + "pt";
+        probe.textContent = text;
+        const lines = Math.max(1, Math.round(probe.scrollHeight / (lead * 96 / 72)));
+        const height = (lines - 1) * lead + size;
+        if(height <= maxHeight || size <= floor){
+          return {size, lines, overflow: height > maxHeight};
+        }
+        size = Math.max(floor, size - 0.25);
+      }
+    }
+
+    let capRaf = null;
+    function scheduleCapacity(){
+      if(capRaf) return;
+      capRaf = requestAnimationFrame(() => { capRaf = null; recomputeCapacity(); });
+    }
+    // available_rect depends on every OTHER paragraph on the page, so
+    // moving or deleting one box changes its neighbours' capacity --
+    // recompute page-wide, never just the touched box. A stale amber/red
+    // dot is worse than none.
+    function recomputeCapacity(){
+      const boxes = [...EDIT.values()];
+      for(const box of boxes){
+        const el = editLayer.querySelector('.pbox[data-key="' + box.key + '"]');
+        if(!el) continue;
+        const cap = el.querySelector(".pbox-cap");
+        const grow = el.querySelector(".pbox-grow");
+        if(box.op === "deleted"){ cap.textContent = ""; grow.style.height = "0"; continue; }
+        const availY1 = availableY1(box, boxes);
+        const info = fitInfo(box, availY1);
+        let state, label;
+        if(info.overflow){ state = "overflow"; label = "will overflow — the server draws it anyway"; }
+        else if(info.size < box.size - 0.05){ state = "shrunk"; label = `will shrink to ${info.size.toFixed(1)}pt (from ${box.size.toFixed(1)}pt)`; }
+        else{ state = "fits"; label = `fits · ${info.lines} line${info.lines === 1 ? "" : "s"}`; }
+        cap.className = "pbox-cap " + state;
+        cap.textContent = label + " · estimated";
+        el.setAttribute("aria-describedby", cap.id);
+        const growPt = Math.max(0, availY1 - box.rect.y1);
+        const boxHeightPt = Math.max(1, box.rect.y1 - box.rect.y0);
+        grow.style.height = (100 * growPt / boxHeightPt) + "%";
+      }
+    }
+
+    /* ---------------- run styling + serialization ---------------- */
+    function applyRunStyle(span, r){
+      span.style.fontWeight = r.bold ? "700" : "400";
+      span.style.fontStyle = r.italic ? "italic" : "normal";
+      span.style.textDecoration = r.underline ? "underline" : "none";
+      span.style.color = rgbCss(r.color);
+      span.style.background = r.highlight ? rgbCss(r.highlight) : "transparent";
+    }
+
+    // The fragile one. contentEditable mutates the DOM in ways that
+    // don't respect run boundaries -- bare text nodes, split spans, a
+    // stray <br>. Rules: normalize() first; a bare text node merges into
+    // the nearest PRECEDING run; a run that's empty after editing is
+    // dropped; if editing wiped every run (select-all-and-type), collapse
+    // to one run carrying the box's dominant (first) style -- matching
+    // what pipeline.dominant_style would do with the same input.
+    function serializeRuns(key, textEl){
+      const box = getBox(key);
+      textEl.normalize();
+      const out = [];
+      let lastStyleIdx = 0;
+      for(const node of textEl.childNodes){
+        if(node.nodeType === Node.ELEMENT_NODE && node.classList.contains("run")){
+          const idx = Math.min(box.runs.length - 1, Number(node.dataset.run) || 0);
+          lastStyleIdx = idx;
+          const text = node.textContent;
+          if(text.length) out.push({styleIdx: idx, text});
+        } else if(node.nodeType === Node.TEXT_NODE && node.textContent.length){
+          out.push({styleIdx: lastStyleIdx, text: node.textContent});
+        }
+      }
+      if(out.length === 0){
+        box.runs = [{...box.runs[0], text: ""}];
+        return;
+      }
+      // Merge consecutive fragments that share a style index back into
+      // one run (typing inside a run generally re-splits it per keystroke
+      // in some browsers' editing models).
+      const merged = [];
+      for(const frag of out){
+        const last = merged[merged.length - 1];
+        if(last && last.styleIdx === frag.styleIdx) last.text += frag.text;
+        else merged.push({...frag});
+      }
+      box.runs = merged.map(m => ({...box.runs[m.styleIdx], text: m.text}));
+    }
+
+    /* ---------------- box mounting ---------------- */
+    function layoutBoxEl(el, box){
+      const pr = pctRect(box.rect);
+      el.style.left = pr.left + "%";
+      el.style.top = pr.top + "%";
+      el.style.width = pr.width + "%";
+      el.style.minHeight = pr.height + "%";
+      const lead = box.leading || box.size * 1.18;
+      el.style.fontSize = "calc(var(--pp-scale) * " + box.size + "px)";
+      el.style.lineHeight = "calc(var(--pp-scale) * " + lead + "px)";
+      // Approximate first-baseline registration: draw_paragraph anchors
+      // the first baseline at origin[1] absolutely; CSS positions line
+      // boxes. 0.78 is a serif ascent approximation -- a known ~1px
+      // error, not worth an exact per-style probe for a design prototype.
+      const padTopPt = Math.max(0, (box.origin[1] - box.rect.y0) - 0.78 * box.size);
+      el.style.paddingTop = "calc(var(--pp-scale) * " + padTopPt + "px)";
+      el.style.textAlign = (box.align === "justify") ? "left" : box.align;
+    }
+
+    function renderBoxes(){
+      editLayer.innerHTML = "";
+      pageIr.paragraphs.forEach((p, i) => {
+        const key = paraKey(i);
+        const box = getBox(key);
+        const el = document.createElement("div");
+        el.className = "pbox" + (box.op === "deleted" ? " deleted" : "");
+        el.dataset.key = key;
+        el.tabIndex = 0;
+        el.setAttribute("role", "group");
+        el.setAttribute("aria-label", `Paragraph ${i + 1} of ${pageIr.paragraphs.length}, page 1`);
+        layoutBoxEl(el, box);
+
+        const textEl = document.createElement("div");
+        textEl.className = "pbox-text";
+        textEl.setAttribute("contenteditable", supportsPlaintextOnly ? "plaintext-only" : "true");
+        textEl.spellcheck = false;
+        box.runs.forEach((r, ri) => {
+          const span = document.createElement("span");
+          span.className = "run";
+          span.dataset.run = String(ri);
+          applyRunStyle(span, r);
+          span.textContent = r.text;
+          textEl.appendChild(span);
+        });
+        el.appendChild(textEl);
+
+        const grow = document.createElement("div");
+        grow.className = "pbox-grow";
+        el.appendChild(grow);
+
+        const cap = document.createElement("span");
+        cap.className = "pbox-cap";
+        cap.id = "cap-" + key;
+        el.appendChild(cap);
+
+        const grip = document.createElement("button");
+        grip.className = "pbox-grip";
+        grip.setAttribute("aria-hidden", "true");
+        grip.tabIndex = -1;
+        el.appendChild(grip);
+
+        if(box.op === "deleted"){
+          const restore = document.createElement("button");
+          restore.className = "pbox-restore";
+          restore.textContent = "removed · click to restore";
+          restore.addEventListener("click", (e) => { e.stopPropagation(); toggleDelete(key, false); });
+          el.appendChild(restore);
+        }
+
+        editLayer.appendChild(el);
+        wireBox(el, textEl, grip, key);
+      });
+      scheduleCapacity();
+    }
+
+    /* ---------------- selection / focus ---------------- */
+    function selectBox(key){
+      if(editingKey && editingKey !== key) exitTextEdit(editingKey);
+      selectedKey = key;
+      editLayer.querySelectorAll(".pbox").forEach(el => el.classList.toggle("selected", el.dataset.key === key));
+      syncToolbar();
+    }
+    function deselect(){
+      selectedKey = null;
+      editLayer.querySelectorAll(".pbox").forEach(el => el.classList.remove("selected"));
+      syncToolbar();
+    }
+    function enterTextEdit(key){
+      if(getBox(key).op === "deleted") return;
+      selectBox(key);
+      editingKey = key;
+      const el = editLayer.querySelector('.pbox[data-key="' + key + '"]');
+      el.classList.add("editing");
+      const textEl = el.querySelector(".pbox-text");
+      textEl.focus();
+    }
+    function exitTextEdit(key){
+      const el = editLayer.querySelector('.pbox[data-key="' + key + '"]');
+      if(!el) { editingKey = null; return; }
+      el.classList.remove("editing");
+      const textEl = el.querySelector(".pbox-text");
+      serializeRuns(key, textEl);
+      markModified(key);
+      // Re-render just this box's runs so style spans match the
+      // (possibly merged) serialized runs exactly.
+      textEl.innerHTML = "";
+      getBox(key).runs.forEach((r, ri) => {
+        const span = document.createElement("span");
+        span.className = "run"; span.dataset.run = String(ri);
+        applyRunStyle(span, r); span.textContent = r.text;
+        textEl.appendChild(span);
+      });
+      editingKey = null;
+      scheduleCapacity();
+    }
+
+    /* ---------------- move / resize / delete ---------------- */
+    function currentPxPerPt(){
+      const r = stack.getBoundingClientRect();
+      return {x: r.width / PT_W, y: r.height / PT_H};
+    }
+    function translateBox(key, startRect, startOrigin, dxPt, dyPt){
+      const box = getBox(key);
+      box.rect = {x0: startRect.x0 + dxPt, x1: startRect.x1 + dxPt, y0: startRect.y0 + dyPt, y1: startRect.y1 + dyPt};
+      // draw_paragraph anchors the first baseline at origin[1] absolutely
+      // -- move it WITH the rect, or the redrawn text sits at the old
+      // baseline and available_rect's max_height math goes wrong.
+      box.origin = [startOrigin[0] + dxPt, startOrigin[1] + dyPt];
+      markModified(key);
+      const el = editLayer.querySelector('.pbox[data-key="' + key + '"]');
+      if(el) layoutBoxEl(el, box);
+      scheduleCapacity();
+    }
+    function resizeBoxWidth(key, startRect, dxPt){
+      const box = getBox(key);
+      const newX1 = Math.max(startRect.x0 + 20, startRect.x1 + dxPt);
+      box.rect = {...startRect, x1: newX1};
+      markModified(key);
+      const el = editLayer.querySelector('.pbox[data-key="' + key + '"]');
+      if(el) layoutBoxEl(el, box);
+      scheduleCapacity();
+    }
+    function toggleDelete(key, deleted){
+      pushUndo(key);
+      const box = getBox(key);
+      // Restoring doesn't try to detect whether the box is now byte-identical
+      // to its original state -- it's still "modified" (the user took an
+      // explicit delete-then-restore action, worth keeping in the diff)
+      // rather than silently reverting to "kept".
+      box.op = deleted ? "deleted" : "modified";
+      const el = editLayer.querySelector('.pbox[data-key="' + key + '"]');
+      if(el) el.classList.toggle("deleted", deleted);
+      refreshEditFooter();
+      renderBoxes(); // simplest correct way to add/remove the restore affordance + grip
+      if(!deleted) selectBox(key);
+      toast(deleted ? "Paragraph removed — undoable below." : "Paragraph restored.");
+    }
+
+    /* ---------------- formatting ---------------- */
+    // Emphasis is run-scoped, never selection-scoped: the renderer stores
+    // styling per run and cannot represent mid-sentence emphasis
+    // (docs/design/limitations.md). When editing text, the format applies
+    // to the run containing the caret; when a box is merely selected
+    // (not editing), it applies to every run in the box. Either way, the
+    // WHOLE affected run flashes so the granularity is visible rather
+    // than implied by a floating selection popup (which this toolbar
+    // deliberately isn't).
+    function caretRunIndex(textEl){
+      const sel = window.getSelection();
+      if(!sel || sel.rangeCount === 0) return null;
+      let node = sel.getRangeAt(0).startContainer;
+      if(node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+      const run = node && node.closest(".run");
+      return run ? Number(run.dataset.run) : null;
+    }
+    function flashRun(el, idx){
+      const span = el.querySelector('.run[data-run="' + idx + '"]');
+      if(!span) return;
+      span.classList.remove("flash"); void span.offsetWidth; span.classList.add("flash");
+    }
+    function applyFormat(fmt, value){
+      if(!selectedKey) return;
+      const key = selectedKey;
+      const box = getBox(key);
+      const el = editLayer.querySelector('.pbox[data-key="' + key + '"]');
+      pushUndo(key);
+      const textEl = el.querySelector(".pbox-text");
+      const idx = (editingKey === key) ? caretRunIndex(textEl) : null;
+      const targets = (idx !== null) ? [idx] : box.runs.map((_, i) => i);
+      for(const i of targets){
+        const r = box.runs[i];
+        if(fmt === "bold") r.bold = !r.bold;
+        else if(fmt === "italic") r.italic = !r.italic;
+        else if(fmt === "underline") r.underline = !r.underline;
+        else if(fmt === "highlight") r.highlight = r.highlight ? null : value;
+        else if(fmt === "color") r.color = value.slice();
+      }
+      markModified(key);
+      // Re-apply styles in place (no full remount) so focus/caret survive.
+      textEl.querySelectorAll(".run").forEach(span => {
+        const i = Number(span.dataset.run);
+        if(targets.includes(i)) applyRunStyle(span, box.runs[i]);
+      });
+      targets.forEach(i => flashRun(el, i));
+      syncToolbar();
+    }
+    function setAlign(align){
+      if(!selectedKey) return;
+      pushUndo(selectedKey);
+      const box = getBox(selectedKey);
+      box.align = align;
+      markModified(selectedKey);
+      const el = editLayer.querySelector('.pbox[data-key="' + selectedKey + '"]');
+      if(el) el.style.textAlign = (align === "justify") ? "left" : align;
+      syncToolbar();
+    }
+
+    const SWATCHES = [[0,0,0], [0.42,0.05,0.32], [0.02,0.20,0.55], [0.35,0.37,0.40]];
+    function buildColorSwatches(){
+      const wrap = document.getElementById("etColors");
+      wrap.innerHTML = "";
+      SWATCHES.forEach(c => {
+        const b = document.createElement("button");
+        b.className = "et-swatch"; b.style.background = rgbCss(c);
+        b.setAttribute("aria-label", "Text colour");
+        b.addEventListener("click", () => applyFormat("color", c));
+        b.dataset.color = c.join(",");
+        wrap.appendChild(b);
+      });
+    }
+    buildColorSwatches();
+
+    function syncToolbar(){
+      const has = !!selectedKey;
+      toolbar.querySelectorAll(".et-btn, .et-swatch").forEach(b => b.disabled = !has);
+      document.getElementById("etTarget").textContent = has
+        ? `Paragraph ${Number(selectedKey.split(":")[1]) + 1}` + (editingKey === selectedKey ? " · editing text" : "")
+        : "No paragraph selected";
+      if(!has){
+        document.querySelectorAll(".et-btn.on").forEach(b => b.classList.remove("on"));
+        document.querySelectorAll(".et-swatch.active").forEach(b => b.classList.remove("active"));
+        return;
+      }
+      const box = getBox(selectedKey);
+      const el = editLayer.querySelector('.pbox[data-key="' + selectedKey + '"]');
+      const textEl = el && el.querySelector(".pbox-text");
+      const idx = (editingKey === selectedKey && textEl) ? caretRunIndex(textEl) : null;
+      const r = box.runs[idx !== null ? idx : 0];
+      document.getElementById("etBold").classList.toggle("on", !!r.bold);
+      document.getElementById("etItalic").classList.toggle("on", !!r.italic);
+      document.getElementById("etUnderline").classList.toggle("on", !!r.underline);
+      document.getElementById("etHighlight").classList.toggle("on", !!r.highlight);
+      document.querySelectorAll("#etAlign .et-btn").forEach(b => b.classList.toggle("on", b.dataset.align === box.align));
+      document.querySelectorAll(".et-swatch").forEach(b => {
+        const c = b.dataset.color.split(",").map(Number);
+        b.classList.toggle("active", c.every((v, i) => Math.abs(v - r.color[i]) < 0.01));
+      });
+    }
+    document.getElementById("etBold").addEventListener("click", () => applyFormat("bold"));
+    document.getElementById("etItalic").addEventListener("click", () => applyFormat("italic"));
+    document.getElementById("etUnderline").addEventListener("click", () => applyFormat("underline"));
+    document.getElementById("etHighlight").addEventListener("click", () => applyFormat("highlight", [1, 0.9, 0.54]));
+    document.querySelectorAll("#etAlign .et-btn").forEach(b => b.addEventListener("click", () => setAlign(b.dataset.align)));
+    document.getElementById("etDelete").addEventListener("click", () => { if(selectedKey) toggleDelete(selectedKey, true); });
+
+    /* ---------------- per-box wiring ---------------- */
+    function wireBox(el, textEl, grip, key){
+      let dragging = false, resizing = false, startX = 0, startY = 0, startRect = null, startOrigin = null;
+
+      el.addEventListener("click", (e) => {
+        if(el.classList.contains("deleted") || editingKey === key) return;
+        selectBox(key);
+      });
+      el.addEventListener("dblclick", () => enterTextEdit(key));
+      textEl.addEventListener("blur", () => { if(editingKey === key) exitTextEdit(key); });
+      textEl.addEventListener("input", () => scheduleCapacity());
+      // Firefox contenteditable="true" fallback: block rich formatting
+      // commands and force plain-text paste. Never document.execCommand.
+      if(!supportsPlaintextOnly){
+        textEl.addEventListener("beforeinput", (e) => {
+          if(["formatBold","formatItalic","formatUnderline","insertFromPasteAsQuotation"].includes(e.inputType)) e.preventDefault();
+        });
+        textEl.addEventListener("paste", (e) => {
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+          const sel = window.getSelection();
+          if(sel && sel.rangeCount){ sel.getRangeAt(0).deleteContents(); sel.getRangeAt(0).insertNode(document.createTextNode(text)); }
+        });
+      }
+
+      el.addEventListener("pointerdown", (e) => {
+        if(el.classList.contains("deleted") || el.classList.contains("editing")) return;
+        if(e.target.closest(".pbox-grip") || e.target.closest(".pbox-restore")) return;
+        dragging = true; el.setPointerCapture(e.pointerId);
+        startX = e.clientX; startY = e.clientY;
+        const box = getBox(key);
+        startRect = {...box.rect}; startOrigin = box.origin.slice();
+        pushUndo(key);
+        selectBox(key);
+      });
+      el.addEventListener("pointermove", (e) => {
+        if(!dragging) return;
+        const s = currentPxPerPt();
+        translateBox(key, startRect, startOrigin, (e.clientX - startX) / s.x, (e.clientY - startY) / s.y);
+      });
+      el.addEventListener("pointerup", () => dragging = false);
+      el.addEventListener("pointercancel", () => dragging = false);
+
+      grip.addEventListener("pointerdown", (e) => {
+        e.stopPropagation();
+        resizing = true; grip.setPointerCapture(e.pointerId);
+        startX = e.clientX;
+        startRect = {...getBox(key).rect};
+        pushUndo(key);
+        selectBox(key);
+      });
+      grip.addEventListener("pointermove", (e) => {
+        if(!resizing) return;
+        const s = currentPxPerPt();
+        resizeBoxWidth(key, startRect, (e.clientX - startX) / s.x);
+      });
+      grip.addEventListener("pointerup", () => resizing = false);
+
+      el.addEventListener("keydown", (e) => {
+        if(editingKey === key){
+          if(e.key === "Escape"){ e.preventDefault(); textEl.blur(); el.focus(); }
+          if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b"){ e.preventDefault(); applyFormat("bold"); }
+          if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "i"){ e.preventDefault(); applyFormat("italic"); }
+          if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "u"){ e.preventDefault(); applyFormat("underline"); }
+          return; // everything else reaches the caret
+        }
+        if(el.classList.contains("deleted")) return;
+        if(e.key === "Enter" || e.key === "F2"){ e.preventDefault(); enterTextEdit(key); }
+        else if(e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); toggleDelete(key, true); }
+        else if(e.key === "Escape"){ e.preventDefault(); deselect(); el.blur(); }
+        else if(e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown"){
+          e.preventDefault();
+          const box = getBox(key);
+          const step = e.shiftKey ? 10 : 1;
+          if(e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")){
+            pushUndo(key);
+            resizeBoxWidth(key, box.rect, e.key === "ArrowRight" ? step : -step);
+            return;
+          }
+          let dx = 0, dy = 0;
+          if(e.key === "ArrowLeft") dx = -step; if(e.key === "ArrowRight") dx = step;
+          if(e.key === "ArrowUp") dy = -step; if(e.key === "ArrowDown") dy = step;
+          pushUndo(key);
+          translateBox(key, box.rect, box.origin, dx, dy);
+          toast(`Paragraph ${Number(key.split(":")[1]) + 1} moved.`);
+        }
+      });
+    }
+
+    /* ---------------- undo / discard / export ---------------- */
+    function undo(){
+      const entry = undoStack.pop();
+      if(!entry) return;
+      EDIT.set(entry.key, entry.before);
+      refreshEditFooter();
+      renderBoxes();
+      selectBox(entry.key);
+    }
+    function discardAll(){
+      EDIT.clear();
+      undoStack.length = 0;
+      refreshEditFooter();
+      renderBoxes();
+      deselect();
+      toast("All edits discarded.");
+    }
+    document.getElementById("editUndo").addEventListener("click", undo);
+    document.getElementById("editDiscard").addEventListener("click", discardAll);
+    document.getElementById("editExport").addEventListener("click", () => {
+      const paragraphs = pageIr.paragraphs.map((p, i) => {
+        const key = paraKey(i);
+        const box = EDIT.get(key);
+        if(!box) return {...p, id: key, edit: "kept"};
+        return {
+          text: box.runs.map(r => r.text).join(""),
+          runs: box.runs,
+          rect: box.rect, origin: box.origin, align: box.align,
+          leading: box.leading, size: box.size, font: box.font,
+          color: p.color, indent: p.indent, hang_x0: box.hang_x0 ?? p.hang_x0,
+          starts_item: p.starts_item, clip: p.clip,
+          id: key, edit: box.op,
+        };
+      });
+      const payload = {
+        schema: 1, job: "prototype-sample",
+        document: {source: LAYOUT.source, pages: [{number: 0, width: pageIr.width, height: pageIr.height, paragraphs}]},
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type: "application/json"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "trust-deed-aurora.edits.json";
+      a.click();
+      toast("Prototype only — the real build PATCHes this to /api/jobs/{id}/layout.");
+    });
+
+    /* ---------------- mode toggle ---------------- */
+    function setEditMode(on){
+      stack.dataset.mode = on ? "edit" : "compare";
+      modeCompareBtn.classList.toggle("active", !on);
+      modeEditBtn.classList.toggle("active", on);
+      modeCompareBtn.setAttribute("aria-checked", String(!on));
+      modeEditBtn.setAttribute("aria-checked", String(on));
+      toolbar.hidden = !on;
+      editNote.hidden = !on;
+      editFooter.hidden = !on;
+      editLayer.hidden = !on;
+      if(on){
+        // Entering edit: the source layer is hidden outright, not set to
+        // 0% -- .page-wipe (id=wipe2Wipe) IS the source image (see the
+        // .over/clip-path note in <style>), so leaving it at some
+        // percentage would still show a strip of Spanish behind the
+        // English edit boxes.
+        wipeSourceLayer.style.display = "none";
+        stack.removeAttribute("role"); stack.removeAttribute("tabindex");
+        stack.style.cursor = "default";
+        if(editLayer.children.length === 0) renderBoxes();
+        updateScale();
+        const first = editLayer.querySelector(".pbox");
+        if(first) first.focus();
+      } else {
+        wipeSourceLayer.style.display = "";
+        stack.setAttribute("role", "slider"); stack.setAttribute("tabindex", "0");
+        stack.style.cursor = "ew-resize";
+        deselect();
+        if(editingKey) exitTextEdit(editingKey);
+      }
+    }
+    modeCompareBtn.addEventListener("click", () => setEditMode(false));
+    modeEditBtn.addEventListener("click", () => setEditMode(true));
+    // Exposed so leaving the compare view entirely (Back to results, or
+    // jumping to a different page via "View on page") always resets to
+    // Compare -- edit state itself is NOT cleared, only the view mode.
+    window.__ppResetToCompareMode = () => setEditMode(false);
+  })();
+
+  /* ---------------- running-state demo animation ---------------- */
+  let runInterval = null;
+  function startRunningDemo(animate){
+    clearInterval(runInterval);
+    const bar = document.getElementById("translateBar");
+    const count = document.getElementById("translateCount");
+    // Jumping to "running" via the dev switcher (or back/forward) shows the
+    // static mid-progress snapshot already baked into the markup, so a
+    // reviewer can inspect the state without it disappearing in a few
+    // seconds. Only the real "Translate N documents →" button animates.
+    if(!animate){
+      bar.style.width = "56%";
+      count.textContent = "87";
+      return;
+    }
+    let n = 87;
+    runInterval = setInterval(() => {
+      n += 7;
+      if(n >= 154){
+        n = 154;
+        bar.style.width = "100%";
+        count.textContent = n;
+        clearInterval(runInterval);
+        setTimeout(() => goto("results"), 550);
+        return;
+      }
+      count.textContent = n;
+      bar.style.width = Math.round((n/154)*100) + "%";
+    }, 420);
+  }
+  document.getElementById("cancelBtn").addEventListener("click", () => {
+    clearInterval(runInterval);
+    goto("estimate");
+  });
+})();
+</script>
+</body>
+</html>

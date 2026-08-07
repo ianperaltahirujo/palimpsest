@@ -1,0 +1,544 @@
+window.PP_LAYOUT = {
+  "schema": 1,
+  "source": "trust-deed-aurora.en.pdf",
+  "pages": [
+    {
+      "number": 0,
+      "width": 612.0,
+      "height": 792.0,
+      "paragraphs": [
+        {
+          "text": "DOMINICAN REPUBLIC — COMMERCIAL REGISTRY",
+          "runs": [
+            {
+              "text": "DOMINICAN REPUBLIC — COMMERCIAL REGISTRY",
+              "font": "Georgia-Bold",
+              "size": 8.2,
+              "bold": true,
+              "italic": false,
+              "color": [
+                0.4196078431372549,
+                0.050980392156862744,
+                0.3215686274509804
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 72.00814819335938,
+            "x1": 298.64801025390625,
+            "y1": 81.31514739990234
+          },
+          "origin": [
+            72.0,
+            79.51934814453125
+          ],
+          "align": "left",
+          "leading": 9.67599977493286,
+          "size": 8.199999809265137,
+          "font": "Georgia-Bold",
+          "color": [
+            0.4196078431372549,
+            0.050980392156862744,
+            0.3215686274509804
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "TRUST FORMATION DEED",
+          "runs": [
+            {
+              "text": "TRUST FORMATION DEED",
+              "font": "Georgia-Bold",
+              "size": 17.5,
+              "bold": true,
+              "italic": false,
+              "color": [
+                0.0784313725490196,
+                0.09019607843137255,
+                0.10980392156862745
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 98.01736450195312,
+            "x1": 319.01251220703125,
+            "y1": 117.8798599243164
+          },
+          "origin": [
+            72.0,
+            114.04736328125
+          ],
+          "align": "left",
+          "leading": 20.65,
+          "size": 17.5,
+          "font": "Georgia-Bold",
+          "color": [
+            0.0784313725490196,
+            0.09019607843137255,
+            0.10980392156862745
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "AURORA PLAZA TRUST",
+          "runs": [
+            {
+              "text": "AURORA PLAZA TRUST",
+              "font": "Georgia-Bold",
+              "size": 11.5,
+              "bold": true,
+              "italic": false,
+              "color": [
+                0.0196078431372549,
+                0.2,
+                0.5490196078431373
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 128.01141357421875,
+            "x1": 215.8074951171875,
+            "y1": 141.06390380859375
+          },
+          "origin": [
+            72.0,
+            138.54541015625
+          ],
+          "align": "left",
+          "leading": 13.569999999999999,
+          "size": 11.5,
+          "font": "Georgia-Bold",
+          "color": [
+            0.0196078431372549,
+            0.2,
+            0.5490196078431373
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "File No. FA­0142­2026 · Santo Domingo de Guzmán, Distrito Nacional",
+          "runs": [
+            {
+              "text": "File No. FA­0142­2026 · Santo Domingo de Guzmán, Distrito Nacional",
+              "font": "Georgia",
+              "size": 8.6,
+              "bold": false,
+              "italic": false,
+              "color": [
+                0.34901960784313724,
+                0.3686274509803922,
+                0.4
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 150.00851440429688,
+            "x1": 344.2330627441406,
+            "y1": 159.76951599121094
+          },
+          "origin": [
+            72.0,
+            157.8861083984375
+          ],
+          "align": "left",
+          "leading": 10.148000450134276,
+          "size": 8.600000381469727,
+          "font": "Georgia",
+          "color": [
+            0.34901960784313724,
+            0.3686274509803922,
+            0.4
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "In the city of Santo Domingo de Guzmán, Distrito Nacional, at ten o'clock in the morning on the sixth (6th) day of August, two thousand twenty­six (2026), the following parties appear: on one part, BANCO LITORAL, S.A., a financial intermediation entity organized under the laws of the Dominican Republic, acting in its capacity as trustee, and on the other part, GRUPO MERIDIAN, S.A.S., a duly organized commercial company, acting in its capacity as settlor, who agree to constitute this trust in accordance with the provisions set forth below.",
+          "runs": [
+            {
+              "text": "In the city of Santo Domingo de Guzmán, Distrito Nacional, at ten o'clock in the morning on the sixth (6th) day of August, two thousand twenty­six (2026), the following parties appear: on one part, BANCO LITORAL, S.A., a financial intermediation entity organized under the laws of the Dominican Republic, acting in its capacity as trustee, and on the other part, GRUPO MERIDIAN, S.A.S., a duly organized commercial company, acting in its capacity as settlor, who agree to constitute this trust in accordance with the provisions set forth below.",
+              "font": "Georgia",
+              "size": 10.3,
+              "bold": false,
+              "italic": false,
+              "color": [
+                0.0784313725490196,
+                0.09019607843137255,
+                0.10980392156862745
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 196.0102081298828,
+            "x1": 530.7723999023438,
+            "y1": 274.7603454589844
+          },
+          "origin": [
+            72.0,
+            205.44500732421875
+          ],
+          "align": "left",
+          "leading": 13.41192626953125,
+          "size": 10.300000190734863,
+          "font": "Georgia",
+          "color": [
+            0.0784313725490196,
+            0.09019607843137255,
+            0.10980392156862745
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "FIRST: PURPOSE OF THE TRUST",
+          "runs": [
+            {
+              "text": "FIRST: PURPOSE OF THE TRUST",
+              "font": "Georgia-Bold",
+              "size": 10.3,
+              "bold": true,
+              "italic": false,
+              "color": [
+                0.0784313725490196,
+                0.09019607843137255,
+                0.10980392156862745
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 324.01019287109375,
+            "x1": 250.16940307617188,
+            "y1": 335.7007141113281
+          },
+          "origin": [
+            72.0,
+            333.44500732421875
+          ],
+          "align": "left",
+          "leading": 12.154000225067138,
+          "size": 10.300000190734863,
+          "font": "Georgia-Bold",
+          "color": [
+            0.0784313725490196,
+            0.09019607843137255,
+            0.10980392156862745
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "This trust has as its purpose the administration of the assets described in Exhibit A, as well as the performance of the contractual obligations undertaken by the parties under the agreement dated July twenty­third (23rd), two thousand twenty­six (2026).",
+          "runs": [
+            {
+              "text": "This trust has as its purpose the administration of the assets described in Exhibit A, as well as the performance of the contractual obligations undertaken by the parties under the agreement dated July twenty­third (23rd), two thousand twenty­six (2026).",
+              "font": "Georgia",
+              "size": 10.3,
+              "bold": false,
+              "italic": false,
+              "color": [
+                0.0784313725490196,
+                0.09019607843137255,
+                0.10980392156862745
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 348.01019287109375,
+            "x1": 531.4007568359375,
+            "y1": 386.5245666503906
+          },
+          "origin": [
+            72.0,
+            357.44500732421875
+          ],
+          "align": "left",
+          "leading": 13.41192626953125,
+          "size": 10.300000190734863,
+          "font": "Georgia",
+          "color": [
+            0.0784313725490196,
+            0.09019607843137255,
+            0.10980392156862745
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "SECOND: TRUST ESTATE",
+          "runs": [
+            {
+              "text": "SECOND: TRUST ESTATE",
+              "font": "Georgia-Bold",
+              "size": 10.3,
+              "bold": true,
+              "italic": false,
+              "color": [
+                0.0784313725490196,
+                0.09019607843137255,
+                0.10980392156862745
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 426.01019287109375,
+            "x1": 209.093017578125,
+            "y1": 437.7007141113281
+          },
+          "origin": [
+            72.0,
+            435.44500732421875
+          ],
+          "align": "left",
+          "leading": 12.154000225067138,
+          "size": 10.300000190734863,
+          "font": "Georgia-Bold",
+          "color": [
+            0.0784313725490196,
+            0.09019607843137255,
+            0.10980392156862745
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "The trust estate amounts to RD$48,750,000.00 (forty­eight million seven hundred fifty thousand Dominican pesos), as recorded in the appraisal conducted by the independent firm jointly designated by the parties.",
+          "runs": [
+            {
+              "text": "The trust estate amounts to RD$48,750,000.00 (forty­eight million seven hundred fifty thousand Dominican pesos), as recorded in the appraisal conducted by the independent firm jointly designated by the parties.",
+              "font": "Georgia",
+              "size": 10.3,
+              "bold": false,
+              "italic": false,
+              "color": [
+                0.0784313725490196,
+                0.09019607843137255,
+                0.10980392156862745
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 450.01019287109375,
+            "x1": 530.308837890625,
+            "y1": 488.5245666503906
+          },
+          "origin": [
+            72.0,
+            459.44500732421875
+          ],
+          "align": "left",
+          "leading": 13.41192626953125,
+          "size": 10.300000190734863,
+          "font": "Georgia",
+          "color": [
+            0.0784313725490196,
+            0.09019607843137255,
+            0.10980392156862745
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "WITNESSES OF HONOR",
+          "runs": [
+            {
+              "text": "WITNESSES OF HONOR",
+              "font": "Georgia-Bold",
+              "size": 8.2,
+              "bold": true,
+              "italic": false,
+              "color": [
+                0.4196078431372549,
+                0.050980392156862744,
+                0.3215686274509804
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 556.0081787109375,
+            "x1": 175.8366241455078,
+            "y1": 565.3151245117188
+          },
+          "origin": [
+            72.0,
+            563.5193481445312
+          ],
+          "align": "left",
+          "leading": 9.67599977493286,
+          "size": 8.199999809265137,
+          "font": "Georgia-Bold",
+          "color": [
+            0.4196078431372549,
+            0.050980392156862744,
+            0.3215686274509804
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "Andrés Carreño Special Attorney­in­Fact Grupo Meridian, S.A.S.",
+          "runs": [
+            {
+              "text": "Andrés Carreño Special Attorney­in­Fact Grupo Meridian, S.A.S.",
+              "font": "Georgia",
+              "size": 9.6,
+              "bold": false,
+              "italic": false,
+              "color": [
+                0.0784313725490196,
+                0.09019607843137255,
+                0.10980392156862745
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 580.009521484375,
+            "x1": 175.63198852539062,
+            "y1": 615.9064331054688
+          },
+          "origin": [
+            72.0,
+            588.8031005859375
+          ],
+          "align": "left",
+          "leading": 12.500457763671875,
+          "size": 9.600000381469727,
+          "font": "Georgia",
+          "color": [
+            0.0784313725490196,
+            0.09019607843137255,
+            0.10980392156862745
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "Lucía Fernández Roa Trust Director Banco Litoral, S.A.",
+          "runs": [
+            {
+              "text": "Lucía Fernández Roa Trust Director Banco Litoral, S.A.",
+              "font": "Georgia",
+              "size": 9.6,
+              "bold": false,
+              "italic": false,
+              "color": [
+                0.0784313725490196,
+                0.09019607843137255,
+                0.10980392156862745
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 320.0,
+            "y0": 580.009521484375,
+            "x1": 409.52960205078125,
+            "y1": 615.9064331054688
+          },
+          "origin": [
+            320.0,
+            588.8031005859375
+          ],
+          "align": "left",
+          "leading": 12.500457763671875,
+          "size": 9.600000381469727,
+          "font": "Georgia",
+          "color": [
+            0.0784313725490196,
+            0.09019607843137255,
+            0.10980392156862745
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        },
+        {
+          "text": "Page 1 of 1 · Recorded with the Directorate General of Internal Revenue",
+          "runs": [
+            {
+              "text": "Page 1 of 1 · Recorded with the Directorate General of Internal Revenue",
+              "font": "Georgia",
+              "size": 7.6,
+              "bold": false,
+              "italic": false,
+              "color": [
+                0.45098039215686275,
+                0.47058823529411764,
+                0.5019607843137255
+              ]
+            }
+          ],
+          "rect": {
+            "x0": 72.0,
+            "y0": 728.0075073242188,
+            "x1": 313.8472595214844,
+            "y1": 736.633544921875
+          },
+          "origin": [
+            72.0,
+            734.9691162109375
+          ],
+          "align": "left",
+          "leading": 8.96799988746643,
+          "size": 7.599999904632568,
+          "font": "Georgia",
+          "color": [
+            0.45098039215686275,
+            0.47058823529411764,
+            0.5019607843137255
+          ],
+          "indent": 0.0,
+          "hang_x0": null,
+          "starts_item": false,
+          "clip": null
+        }
+      ]
+    }
+  ],
+  "render": {
+    "zoom": 1.6,
+    "pages": [
+      {
+        "number": 0,
+        "png": "output.png",
+        "px_width": 980,
+        "px_height": 1268
+      }
+    ]
+  }
+};
