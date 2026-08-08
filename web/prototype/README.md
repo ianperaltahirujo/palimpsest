@@ -178,6 +178,27 @@ Edit mode is also scoped to digital PDFs only: the overlay masks
 previously-drawn text with flat paper, which is honest on a digital page
 and would misrepresent a scan, where the background is a photograph.
 
+## Office files (.docx / .pptx / .xlsx)
+
+Upload, translate, and download all work the same as PDF. Compare (the
+wipe view) works too, for real pages -- but not via `fitz.open()`,
+which accepts these formats without erroring yet doesn't actually
+render them (verified empirically: a 3-page .docx and a 3-slide .pptx
+each report exactly one page, a fixed generic canvas, with every
+page's/slide's text concatenated together; a spreadsheet's cells don't
+extract as text at all). `server/office/render.py` instead shells out
+to LibreOffice headless (`soffice --headless --convert-to pdf`) for a
+real rendering, cached per file so a page is only converted once, then
+reuses the same PDF page pipeline as everything else. If LibreOffice
+isn't installed, `GET /pages/{n}.png` returns a 503 with an actionable
+message rather than a blank or misleading image — translation itself
+never depends on it.
+
+**Edit mode stays PDF-only** regardless of LibreOffice: it depends on
+`pdf.layout.extract_paragraphs`'s paragraph-rect model, which has no
+equivalent for a word processor's reflow or a slide's shape tree.
+`GET`/`PATCH /jobs/{id}/layout` reject Office files with a 400.
+
 ## Contents
 
 - `src/App.jsx` — the `AppShell` layout, six-state routing (`state.jsx`).

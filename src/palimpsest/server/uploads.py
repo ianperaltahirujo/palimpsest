@@ -115,6 +115,10 @@ def validate_and_save(
         kind = classify_pdf(str(dest_path))
     else:
         kind = "office"
+        # Not computed eagerly: a real page count needs a LibreOffice
+        # conversion (see office.render), which is too slow to run
+        # inline in an upload request. `GET /pages/{n}.png` converts
+        # and caches on first request instead.
         pages = None
 
     return UploadedFile(

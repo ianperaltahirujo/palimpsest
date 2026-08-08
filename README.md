@@ -70,7 +70,10 @@ to bind wider). API keys are read from the environment exactly like the
 CLI — never accepted over HTTP, never stored in a job record. See
 [`web/prototype/README.md`](web/prototype/README.md) for the frontend
 itself, including `--dev` mode for working on the UI against a live API
-without rebuilding on every change.
+without rebuilding on every change, and its "Office files" section for
+what previewing a `.docx`/`.pptx`/`.xlsx` in the browser needs
+([LibreOffice](https://www.libreoffice.org/download/download/), optional
+and only for that preview — translation itself never needs it).
 
 ## Why this exists, not just what it does
 

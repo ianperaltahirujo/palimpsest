@@ -15,8 +15,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from palimpsest.config.model import Config, FontsConfig, PathsConfig, ThresholdsConfig
+from palimpsest.office.render import find_soffice
 from palimpsest.server.app import create_app
 from tests.fixtures.fake_backend import FakeBackend
+from tests.fixtures.office_docs import docx_bytes
 
 
 def _config(tmp_path) -> Config:
@@ -299,6 +301,52 @@ def test_patch_layout_rejects_malformed_payload(client):
 
     resp = client.patch(f"/api/jobs/{job_id}/layout", json={"note": "not a layout envelope"})
     assert resp.status_code == 400
+
+
+# -- office file preview --------------------------------------------------
+
+
+_DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def _office_job(client) -> tuple[str, str]:
+    resp = client.post(
+        "/api/uploads", files={"file": ("doc.docx", docx_bytes(), _DOCX_MIME)}
+    )
+    assert resp.status_code == 200, resp.text
+    uploaded = resp.json()
+    assert uploaded["kind"] == "office"
+    job_id = client.post("/api/jobs", json={"file_ids": [uploaded["file_id"]]}).json()["job_id"]
+    _wait_for_job(client, job_id)
+    return job_id, uploaded["file_id"]
+
+
+def test_office_edit_mode_is_rejected(client):
+    job_id, _ = _office_job(client)
+    resp = client.get(f"/api/jobs/{job_id}/layout")
+    assert resp.status_code == 400
+    assert "Office" in resp.json()["detail"]
+
+    patch_resp = client.patch(f"/api/jobs/{job_id}/layout", json={"document": {"pages": []}})
+    assert patch_resp.status_code == 400
+
+
+def test_office_page_preview_returns_503_when_libreoffice_missing(client, monkeypatch):
+    from palimpsest.server import routes
+
+    monkeypatch.setattr(routes.office_render, "find_soffice", lambda: None)
+    job_id, _ = _office_job(client)
+    resp = client.get(f"/api/jobs/{job_id}/pages/0.png?side=source")
+    assert resp.status_code == 503
+    assert "LibreOffice" in resp.json()["detail"]
+
+
+@pytest.mark.skipif(find_soffice() is None, reason="LibreOffice not installed on this machine")
+def test_office_page_preview_renders_a_real_page(client):
+    job_id, _ = _office_job(client)
+    resp = client.get(f"/api/jobs/{job_id}/pages/0.png?side=source")
+    assert resp.status_code == 200, resp.text
+    assert resp.content.startswith(b"\x89PNG")
 
 
 # -- origin check middleware ---------------------------------------------

@@ -18,6 +18,8 @@ from palimpsest.config import loader as config_loader
 from palimpsest.config.model import EntityGroups
 from palimpsest.core import ir
 from palimpsest.core import paths as core_paths
+from palimpsest.core.errors import DependencyError
+from palimpsest.office import render as office_render
 from palimpsest.pdf import layout as pdf_layout
 from palimpsest.pdf import reflow
 from palimpsest.qa.compare import render_page
@@ -316,6 +318,19 @@ def page_png(
         raise HTTPException(status_code=400, detail='side must be "source" or "output"')
     if path is None or not path.is_file():
         raise HTTPException(status_code=404, detail=f"{side} page not available yet")
+
+    if jf.kind == "office":
+        # `fitz.open()` "succeeds" on Office files but doesn't actually
+        # render pages (see office.render's docstring) -- convert to a
+        # real PDF via LibreOffice first, cached alongside the source
+        # file so repeated page requests don't reconvert. Keyed by
+        # `side`, not just the file, since source and output are two
+        # different documents that happen to share a directory when
+        # `side == "output"` (multiple files in one job share `out_dir`).
+        try:
+            path = office_render.ensure_preview_pdf(path, path.parent, f"{side}-{jf.file_id}")
+        except DependencyError as e:
+            raise HTTPException(status_code=503, detail=str(e)) from e
 
     image = render_page(path, page_no, dpi=dpi)
     buf = io.BytesIO()
