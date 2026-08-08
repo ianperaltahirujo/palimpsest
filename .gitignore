@@ -6,6 +6,12 @@
 private/
 *.private.toml
 
+# A palimpsest.toml at the repo root is a personal project-config override
+# (thresholds, backend choice, etc.) -- not the project's own default, even
+# though this repo IS the tool's source. Anchored to the root only so
+# examples/palimpsest.toml (a tracked, documented example) is unaffected.
+/palimpsest.toml
+
 # Runtime state: OCR intermediates, translation cache, run reports.
 # The cache is the most valuable and most confidential artifact this tool
 # produces -- it is a parallel corpus of the user's real documents.
