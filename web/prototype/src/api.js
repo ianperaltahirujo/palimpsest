@@ -60,6 +60,15 @@ export function health() {
   return requestJson("/api/health");
 }
 
+// keys: {anthropic_api_key?, gemini_api_key?} -- an absent/empty field is
+// a no-op server-side, not a clear (server/schemas.py's SetKeysRequest).
+// Returns the same shape health() does; never echoes the raw value back.
+export function setKeys(keys) {
+  return requestJson("/api/keys", {
+    method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(keys),
+  });
+}
+
 export function getEntities() {
   return requestJson("/api/entities");
 }

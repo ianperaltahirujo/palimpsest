@@ -3,12 +3,13 @@ import { Anchor, Box, PasswordInput, Radio, Text, TextInput } from "@mantine/cor
 import { VENDOR_COLORS } from "../theme.js";
 import { BACKEND_COPY } from "../state.jsx";
 import { useAppState } from "../state.jsx";
-import { useT } from "../i18n.jsx";
+import { T, useT } from "../i18n.jsx";
 import { MOCK, getApiBase, setApiBase } from "../config.js";
 import * as api from "../api.js";
 
 const ENV_VAR = { anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY" };
 const HEALTH_KEY = { anthropic: "anthropic_key_present", gemini: "gemini_key_present" };
+const KEY_FIELD = { anthropic: "anthropic_api_key", gemini: "gemini_api_key" };
 
 // Part B of the pass-3 plan: vendor colour lives on the selection
 // indicator, not a separate dot. Radio.Card gives the radio semantics and
@@ -38,6 +39,9 @@ export default function BackendSelector() {
   const [healthError, setHealthError] = useState(null);
   const [addressOpen, setAddressOpen] = useState(false);
   const [addressDraft, setAddressDraft] = useState(() => getApiBase());
+  const [entryOpen, setEntryOpen] = useState(false);
+  const [entryKey, setEntryKey] = useState("");
+  const [entryStatus, setEntryStatus] = useState("idle"); // idle | saving | error
 
   const backend = MOCK ? mockBackend : selectedBackend || "gemini";
   const copy = BACKEND_COPY[backend];
@@ -62,6 +66,20 @@ export default function BackendSelector() {
     setAddressDraft(getApiBase());
     setAddressOpen(false);
     fetchHealth();
+  }
+
+  function submitEntryKey() {
+    const value = entryKey.trim();
+    if (!value) return;
+    setEntryStatus("saving");
+    api.setKeys({ [KEY_FIELD[backend]]: value })
+      .then((h) => {
+        setHealth(h);
+        setEntryKey("");
+        setEntryStatus("idle");
+        setEntryOpen(false);
+      })
+      .catch(() => setEntryStatus("error"));
   }
 
   function selectBackend(v) {
@@ -186,7 +204,7 @@ export default function BackendSelector() {
       {copy.needsKey && !MOCK && healthError && (
         <div style={{ marginTop: 10 }}>
           <Text size="xs" fw={600} c="flag">
-            {t("backend.healthUnreachable")}
+            <T k="backend.healthUnreachable" />
           </Text>
           <Text size="xs" mt={6}>
             <Anchor size="xs" component="button" type="button" onClick={fetchHealth}>
@@ -196,20 +214,63 @@ export default function BackendSelector() {
         </div>
       )}
 
-      {copy.needsKey && !MOCK && !healthError && (
+      {copy.needsKey && !MOCK && !healthError && health === null && (
+        <div style={{ marginTop: 10 }}>
+          <Text size="xs" c="dimmed">{t("backend.healthChecking")}</Text>
+        </div>
+      )}
+
+      {copy.needsKey && !MOCK && !healthError && health !== null && keyPresent && !entryOpen && (
         <div style={{ marginTop: 10 }}>
           <Text size="xs" c="dimmed" ff="monospace" mb={4}>
             {ENV_VAR[backend]}
           </Text>
-          <Text size="xs" fw={600} c={health === null ? "dimmed" : keyPresent ? "ok" : "flag"}>
-            {health === null
-              ? t("backend.healthChecking")
-              : keyPresent
-                ? t("backend.keyDetected")
-                : t("backend.keyMissing")}
+          <Text size="xs" fw={600} c="ok">
+            {t("backend.keyDetected")}
           </Text>
           <Text size="xs" c="dimmed" mt={6}>
             {t("backend.keyServerNote")}{" "}
+            <Anchor size="xs" component="button" type="button" onClick={() => setEntryOpen(true)}>
+              {t("backend.keyChange")}
+            </Anchor>
+            {" · "}
+            <Anchor size="xs" component="button" type="button" onClick={fetchHealth}>
+              {t("backend.recheck")}
+            </Anchor>
+          </Text>
+        </div>
+      )}
+
+      {copy.needsKey && !MOCK && !healthError && health !== null && (!keyPresent || entryOpen) && (
+        <div style={{ marginTop: 10 }}>
+          <PasswordInput
+            label={t("backend.apiKeyLabel")}
+            placeholder={backend === "anthropic" ? "sk-ant-..." : "AIza..."}
+            size="sm"
+            value={entryKey}
+            onChange={(e) => { setEntryKey(e.currentTarget.value); setEntryStatus("idle"); }}
+            onKeyDown={(e) => e.key === "Enter" && submitEntryKey()}
+            rightSectionWidth={64}
+            rightSection={
+              <button className="pp-btn-mini" onClick={submitEntryKey} style={{ marginRight: 4 }}>
+                {entryStatus === "saving" ? t("backend.keyEntrySaving") : t("backend.keyEntrySave")}
+              </button>
+            }
+          />
+          <Text size="xs" mt={7} c={entryStatus === "error" ? "flag" : "dimmed"}>
+            {entryStatus === "error"
+              ? t("backend.keyEntryError")
+              : <T k="backend.keyEntryHint" params={{ envVar: ENV_VAR[backend] }} />}
+          </Text>
+          <Text size="xs" mt={4}>
+            {keyPresent && (
+              <>
+                <Anchor size="xs" component="button" type="button" onClick={() => { setEntryOpen(false); setEntryKey(""); setEntryStatus("idle"); }}>
+                  {t("backend.cancel")}
+                </Anchor>
+                {" · "}
+              </>
+            )}
             <Anchor size="xs" component="button" type="button" onClick={fetchHealth}>
               {t("backend.recheck")}
             </Anchor>
