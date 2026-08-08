@@ -38,6 +38,19 @@ async function request(path, options = {}) {
 
 async function requestJson(path, options) {
   const res = await request(path, options);
+  // A 200 with an HTML body happens when there's no /api proxy/route at all
+  // (e.g. `npm run dev` without a live palimpsest server behind it) and the
+  // request falls through to a dev server's or static host's SPA fallback.
+  // request() only checks res.ok, so that case reaches here looking like
+  // success -- reject it explicitly instead of letting res.json() throw an
+  // opaque parse error that callers can't distinguish from "key missing".
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new ApiError(
+      `unreachable server -- is \`palimpsest serve\` running? (got a non-JSON response from ${path})`,
+      0,
+    );
+  }
   return res.json();
 }
 

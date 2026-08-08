@@ -8,7 +8,19 @@ function mockFetchOnce(response) {
 function jsonResponse(body, { ok = true, status = 200, statusText = "OK" } = {}) {
   return {
     ok, status, statusText,
+    headers: { get: () => "application/json" },
     json: async () => body,
+  };
+}
+
+function htmlResponse(html = "<!doctype html><html></html>") {
+  return {
+    ok: true, status: 200, statusText: "OK",
+    headers: { get: () => "text/html" },
+    json: async () => {
+      throw new SyntaxError("Unexpected token '<'");
+    },
+    text: async () => html,
   };
 }
 
@@ -62,6 +74,18 @@ describe("HTTP-level failure", () => {
       expect(e).toBeInstanceOf(ApiError);
       expect(e.status).toBe(400);
     }
+  });
+});
+
+describe("non-JSON 200 response (no /api proxy behind the dev server)", () => {
+  it("rejects with an ApiError instead of an opaque JSON parse error", async () => {
+    mockFetchOnce(htmlResponse());
+    await expect(getEntities()).rejects.toMatchObject({ name: "ApiError", status: 0 });
+  });
+
+  it("names the real problem so it isn't confused with a missing API key", async () => {
+    mockFetchOnce(htmlResponse());
+    await expect(getEntities()).rejects.toThrow(/palimpsest serve/);
   });
 });
 
