@@ -8,6 +8,7 @@ in this file, matching every other test in this project.
 from __future__ import annotations
 
 import json
+import os
 import time
 
 import fitz
@@ -447,3 +448,43 @@ def test_no_extra_origins_means_no_cors_headers_at_all(client):
     )
     assert "access-control-allow-private-network" not in resp.headers
     assert "access-control-allow-origin" not in resp.headers
+
+
+# -- PUT /api/keys --------------------------------------------------------
+
+
+def test_put_keys_sets_env_and_persists_to_dotenv(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # find_dotenv() must never touch the real repo .env
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_fake_backend_factory)
+    with TestClient(app) as c:
+        resp = c.put("/api/keys", json={"anthropic_api_key": "sk-ant-test123"})
+    assert resp.status_code == 200
+    assert resp.json()["anthropic_key_present"] is True
+    assert os.environ["ANTHROPIC_API_KEY"] == "sk-ant-test123"
+    dotenv_path = app.state.palimpsest.dotenv_path
+    assert "sk-ant-test123" in dotenv_path.read_text(encoding="utf-8")
+
+
+def test_put_keys_never_echoes_the_raw_value_back(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_fake_backend_factory)
+    with TestClient(app) as c:
+        resp = c.put("/api/keys", json={"anthropic_api_key": "sk-ant-super-secret"})
+    assert "sk-ant-super-secret" not in resp.text
+
+
+def test_put_keys_empty_field_is_a_noop_not_a_clear(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "already-set-by-shell")
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_fake_backend_factory)
+    with TestClient(app) as c:
+        resp = c.put("/api/keys", json={"gemini_api_key": "new-gemini-key"})
+    assert resp.status_code == 200
+    assert os.environ["ANTHROPIC_API_KEY"] == "already-set-by-shell"
+    assert resp.json()["anthropic_key_present"] is True
+    assert resp.json()["gemini_key_present"] is True

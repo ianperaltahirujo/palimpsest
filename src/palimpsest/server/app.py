@@ -54,6 +54,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dotenv import find_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
@@ -78,6 +79,12 @@ class AppState:
     post_rules: tuple[tuple[str, str], ...]
     entities_path: Path
     uploads_dir: Path
+    dotenv_path: Path
+    """Where `PUT /api/keys` (`routes.py`) persists a submitted key --
+    same resolution `cli.py::main()` uses to LOAD `.env`
+    (`find_dotenv(usecwd=True)`), computed once here rather than
+    per-request so repeated submissions in one run always target the
+    same file. Falls back to `<cwd>/.env` if none exists yet."""
     jobs: JobRegistry
     backend_factory: Callable[[Config], Backend] = make_backend
     """Overridable so tests can inject a `FakeBackend` without a real
@@ -133,11 +140,12 @@ def _load_state(
     uploads_dir = config.paths.work_dir / "server" / "uploads"
     uploads_dir.mkdir(parents=True, exist_ok=True)
     jobs_dir = config.paths.work_dir / "server" / "jobs"
+    dotenv_path = Path(find_dotenv(usecwd=True) or (Path.cwd() / ".env"))
 
     return AppState(
         config=config, entities=entities, glossary=glossary, documents=documents,
         post_rules=post_rules, entities_path=entities_path, uploads_dir=uploads_dir,
-        jobs=JobRegistry(jobs_dir), backend_factory=backend_factory,
+        dotenv_path=dotenv_path, jobs=JobRegistry(jobs_dir), backend_factory=backend_factory,
     )
 
 

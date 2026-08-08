@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 
 import fitz
+from dotenv import set_key
 from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -32,6 +33,7 @@ from palimpsest.server.schemas import (
     EstimateRequest,
     HealthResponse,
     JobResponse,
+    SetKeysRequest,
     UploadResponse,
 )
 from palimpsest.server.uploads import UploadRejected, validate_and_save
@@ -66,6 +68,25 @@ def health(request: Request) -> HealthResponse:
         anthropic_key_present=bool(os.environ.get("ANTHROPIC_API_KEY")),
         gemini_key_present=bool(gemini_key),
     )
+
+
+@router.put("/keys", response_model=HealthResponse)
+def put_keys(request: Request, body: SetKeysRequest) -> HealthResponse:
+    # Only reachable at all from an origin OriginCheckMiddleware already
+    # allowed (app.py) -- a scoped, deliberate exception to "keys never
+    # travel over HTTP", made specifically so a key can be typed into a
+    # page instead of a shell. A field left absent/empty is a no-op, not
+    # a clear -- see SetKeysRequest. Never echoes the raw value back;
+    # health() reports presence only, exactly like every other read path.
+    state = _state(request)
+    for env_name, value in (
+        ("ANTHROPIC_API_KEY", body.anthropic_api_key),
+        ("GEMINI_API_KEY", body.gemini_api_key),
+    ):
+        if value:
+            os.environ[env_name] = value
+            set_key(str(state.dotenv_path), env_name, value)
+    return health(request)
 
 
 # -- entities -----------------------------------------------------------

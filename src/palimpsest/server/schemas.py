@@ -18,6 +18,14 @@ class HealthResponse(BaseModel):
     gemini_key_present: bool
 
 
+class SetKeysRequest(BaseModel):
+    # A field left absent/empty is a no-op, not a clear -- submitting only
+    # a Gemini key must never blank out an already-working Anthropic key
+    # from a prior submission or a real shell export. See PUT /api/keys.
+    anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
+
+
 class UploadResponse(BaseModel):
     file_id: str
     name: str
