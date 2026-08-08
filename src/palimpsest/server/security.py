@@ -11,10 +11,15 @@ the user's own access to their local files. Two independent checks:
    user must make explicitly, not a default.
 2. `OriginCheckMiddleware` below rejects any mutating request whose
    `Origin` header doesn't match an allowed origin. A same-origin
-   request from the served SPA has no `Origin` header at all for
-   navigations, but XHR/fetch always sets one -- browsers do not let a
-   page suppress it -- so this is a real, browser-enforced boundary,
-   not a client-supplied claim we're trusting.
+   *navigation* has no `Origin` header at all, but same-origin
+   XHR/fetch calls -- which is what the served SPA's own upload/job/
+   entities/layout requests are -- DO carry one; browsers do not let a
+   page suppress it. That Origin always equals this request's own
+   scheme+host+port (from the `Host` header, which a browser sets to
+   wherever it actually connected, not something a page can override),
+   so same-origin is checked directly against the incoming request
+   rather than a precomputed allowlist -- `allowed_origins` only needs
+   to cover genuinely CROSS-origin cases, i.e. `--dev`'s Vite port.
 """
 
 from __future__ import annotations
@@ -34,7 +39,8 @@ class OriginCheckMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if request.method in _MUTATING_METHODS:
             origin = request.headers.get("origin")
-            if origin is not None and origin not in self.allowed_origins:
+            same_origin = f"{request.url.scheme}://{request.url.netloc}"
+            if origin is not None and origin != same_origin and origin not in self.allowed_origins:
                 return JSONResponse(
                     {"detail": f"origin {origin!r} not allowed"}, status_code=403
                 )

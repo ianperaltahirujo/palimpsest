@@ -369,3 +369,18 @@ def test_same_origin_request_with_no_origin_header_is_allowed(client):
         "/api/entities", json={"companies": [], "people": [], "places": [], "other": []},
     )
     assert resp.status_code == 200
+
+
+def test_same_origin_request_with_origin_header_is_allowed(client):
+    # Regression test: fetch/XHR from the served SPA itself DOES set an
+    # Origin header even for a same-origin request (browsers never let a
+    # page suppress it) -- an earlier version of OriginCheckMiddleware
+    # only ever allowed `--dev`'s explicit dev_origin, so this exact
+    # request (the shape every real upload/job/entities/layout call from
+    # the built app makes) was rejected with 403 in production mode.
+    resp = client.put(
+        "/api/entities",
+        json={"companies": [], "people": [], "places": [], "other": []},
+        headers={"Origin": str(client.base_url)},
+    )
+    assert resp.status_code == 200
