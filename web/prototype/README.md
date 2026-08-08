@@ -18,7 +18,7 @@ npm run lint     # eslint
 This is a Vite build, not a static file — Mantine publishes no CDN/UMD
 bundle, so opening `index.html` by double-click doesn't work.
 
-## Two modes
+## Three modes
 
 - **Real (default).** Talks to the palimpsest server over `/api/...`.
   Run `palimpsest serve --dev` (binds the API only, no static mount) in
@@ -41,6 +41,21 @@ bundle, so opening `index.html` by double-click doesn't work.
   root), so `VITE_API_BASE` is unset — every fetch is a same-origin
   relative path. `src/api.js` is the whole client; `src/config.js` reads
   `VITE_API_BASE`/`VITE_MOCK`.
+
+- **Standalone (`VITE_STANDALONE=1`, built by `.github/workflows/deploy-pages.yml`).**
+  A build meant to be published somewhere other than `palimpsest serve`
+  itself — a GitHub Pages URL, shared by every visitor, each running
+  their own local server. `src/config.js`'s API address becomes a
+  runtime `localStorage` setting (`getApiBase()`/`setApiBase()`,
+  defaulting to `http://127.0.0.1:8765`, editable from the "Server
+  address" field next to the backend selector) instead of the build-time
+  `VITE_API_BASE` the Real mode above uses, since one public build can't
+  hardcode any one user's server. The local server also needs
+  `palimpsest serve --allow-origin <this build's exact origin>` (see the
+  root `docs/configuration.md`) — a genuinely cross-origin browser tab
+  reaching a loopback server, which additionally requires Chrome's
+  Private Network Access preflight to succeed
+  (`server/security.py`'s `PrivateNetworkAccessMiddleware`).
 
 - **Mock (`VITE_MOCK=1`).** The original design prototype: fixtures from
   `src/state.jsx`, zero network calls, the "prototype states" dev switcher
@@ -111,13 +126,16 @@ the app uses a vendor hue — the Registration system already uses
 blue/magenta *semantically* (translated layer vs. original), and a leaked
 vendor colour would corrupt that language.
 
-In real mode the API-key field is a **read-only status readout**
-("`GEMINI_API_KEY` — detected" / "not set"), not an input — the server
-reads keys from its own process environment exactly like the CLI and
-never accepts one over HTTP (`GET /api/health`'s
-`anthropic_key_present`/`gemini_key_present` booleans, never the values).
-The typed key input only exists in mock mode, where it was always a fake
-650ms `setTimeout`.
+In real mode the API-key field is a **status readout with a real entry
+form** — `GEMINI_API_KEY`/`ANTHROPIC_API_KEY` — detected", or a
+`PasswordInput` + Save when absent, submitting to `PUT /api/keys`. The
+server never echoes a submitted value back (`GET /api/health`'s
+`anthropic_key_present`/`gemini_key_present` booleans only, never the
+values) and applies it immediately — no server restart needed, since
+every credential read in the Python backend is live per-request. Mock
+mode keeps its own separate, always-fake key-check flow (a 650ms
+`setTimeout`, never a real request) since there's no server to talk to
+in that mode at all.
 
 ## Edit mode
 

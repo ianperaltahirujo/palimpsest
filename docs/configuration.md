@@ -94,6 +94,18 @@ alternative to exporting the variables in your shell every session. A
 value already exported in your shell always wins over `.env`. `.env` is
 gitignored; never commit it.
 
+**The web UI's server (`palimpsest serve`) also lets you type a key
+directly into the page** (the sidebar's backend selector) instead of
+touching `.env` or a shell at all — it's written to that same `.env`
+file and takes effect immediately, no restart needed. If you're running
+the frontend from somewhere other than this same server (e.g. a
+published GitHub Pages build, pointed at your local server via its
+"Server address" setting), you also need `palimpsest serve --allow-origin
+<the frontend's exact origin>` — e.g. `https://you.github.io` — so the
+server accepts requests from it at all. Use the real origin your build
+is published at, never a wildcard; see `SECURITY.md` for what this
+flag does and doesn't widen.
+
 ## Thresholds
 
 `[thresholds]` values (bold-detection stem ratio, OCR size-jitter

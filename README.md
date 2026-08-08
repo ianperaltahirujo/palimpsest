@@ -67,11 +67,15 @@ palimpsest serve                 # http://127.0.0.1:8765, opens your browser
 Local-first, single-user, no accounts: everything runs on your own machine
 and binds to loopback by default (`--host` requires an explicit `--i-know`
 to bind wider). API keys are read from the environment exactly like the
-CLI — never accepted over HTTP, never stored in a job record. See
+CLI, and never stored in a job record or echoed back in a response — you
+can also type one into the page itself instead of a shell (`PUT
+/api/keys`, applied immediately, saved to `.env`). See
 [`web/prototype/README.md`](web/prototype/README.md) for the frontend
 itself, including `--dev` mode for working on the UI against a live API
-without rebuilding on every change, and its "Office files" section for
-what previewing a `.docx`/`.pptx`/`.xlsx` in the browser needs
+without rebuilding on every change, its "Standalone" mode for publishing
+a build somewhere other than this server (e.g. GitHub Pages, via
+`--allow-origin`), and its "Office files" section for what previewing a
+`.docx`/`.pptx`/`.xlsx` in the browser needs
 ([LibreOffice](https://www.libreoffice.org/download/download/), optional
 and only for that preview — translation itself never needs it).
 

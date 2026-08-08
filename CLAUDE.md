@@ -104,16 +104,42 @@ emits `False`/`None` for the last two — only edit-mode-driven reflow ever sets
 No auth, by design — see `server/app.py`'s module docstring. What actually stands in for it:
 loopback-only binding by default (`--host` requires `--i-know`), and `server/security.py`'s `OriginCheckMiddleware`,
 which checks a mutating request's `Origin` header against the request's OWN scheme+host+port (derived from the
-`Host` header) rather than a static allowlist — same-origin is always allowed, `--dev`'s Vite origin is the only
-thing that needs an explicit allowlist entry. (An earlier version only allowlisted `--dev`'s origin and rejected
-every same-origin fetch/XHR from the production-built SPA itself, which does send an `Origin` header even for
-same-origin requests — browsers do not let a page suppress it. Don't reintroduce a static-allowlist-only check.)
+`Host` header) rather than a static allowlist — same-origin is always allowed. Anything else — `--dev`'s Vite
+origin, or one or more `--allow-origin` flags for a publicly-hosted frontend build (see below) — must be
+explicitly named via `create_app`'s `extra_origins`; this must never become a wildcard, since this middleware is
+what stands between an arbitrary webpage open in another tab and this server. (An earlier version only
+allowlisted `--dev`'s origin and rejected every same-origin fetch/XHR from the production-built SPA itself, which
+does send an `Origin` header even for same-origin requests — browsers do not let a page suppress it. Don't
+reintroduce a static-allowlist-only check.)
+
+**A standalone frontend build can be published somewhere other than this same server** — e.g. a GitHub Pages
+build of `web/prototype`, with `web/prototype/src/config.js`'s `getApiBase()`/`setApiBase()` (a `localStorage`
+setting, not a build-time constant, since one public build is shared by every user's own local server) pointed
+back at `http://127.0.0.1:<port>`. That's a genuinely cross-origin browser tab reaching a loopback server, which
+needs two things beyond `OriginCheckMiddleware`'s existing allowlist: `--allow-origin <exact origin>` on
+`palimpsest serve` (never guessed or wildcarded — the caller must know and pass the real origin), and
+`PrivateNetworkAccessMiddleware` (`security.py`), which answers the extra CORS-preflight check Chrome requires
+before a public HTTPS origin may reach a private-network/loopback target at all — added to the app only alongside
+`CORSMiddleware`, i.e. only when `extra_origins` is non-empty, and must be added AFTER `CORSMiddleware` (Starlette
+wraps outermost = last-added) so it can extend the preflight response `CORSMiddleware` already built.
 
 API keys are read from the server process's own environment (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`)
-and never accepted over HTTP or stored in a job record — `GET /api/health` reports only whether each is present.
-`cli.py::main()` loads a `.env` file (via `python-dotenv`, `override=False` so a real exported var always wins)
-before dispatching to any subcommand including `serve` — this is a convenience for populating that same
-environment, not a second credential path; a key still never comes from `palimpsest.toml`, argv, or HTTP.
+and are never stored in a job record or included in any response body — `GET /api/health` reports only whether
+each is present. They CAN now be accepted over HTTP: `PUT /api/keys` (`routes.py`) sets `os.environ` directly
+(every credential read in this codebase is live per-request, nothing caches a stale value, so this needs no
+changes anywhere else) and persists to a local `.env` via `python-dotenv`'s `set_key()` so it survives a restart.
+This is a deliberate, narrow exception to "keys never travel over HTTP" — not a general loosening — made
+specifically so a key can be typed into a page instead of a shell: reachable only from an origin
+`OriginCheckMiddleware` already allowed, applied only to this same loopback-bound process's own environment, and
+written only to a `.env` file on this same machine. `cli.py::main()` loads that same `.env` file (via
+`python-dotenv`, `override=False` so a real exported var always wins) before dispatching to any subcommand
+including `serve` — a key still never comes from `palimpsest.toml` or argv, and a submitted key is never echoed
+back in a response.
+
+None of this adds real multi-tenancy: there is still exactly one active key per running server process (setting
+one overwrites it for every subsequent request, not just the caller's own), no per-request auth, and one shared
+job queue (`ThreadPoolExecutor(max_workers=1)`, below) — a standalone frontend build widens WHERE the browser can
+be, not WHO the server trusts once a request passes the origin check.
 
 Jobs run on one `ThreadPoolExecutor(max_workers=1)` per server process (`server/jobs.py`) — deliberate, not a
 missing optimization; a local single-user tool has no reason to translate concurrently. `JobRegistry` persists each
