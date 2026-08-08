@@ -18,7 +18,7 @@ from palimpsest import __version__
 from palimpsest.config import loader as config_loader
 from palimpsest.config.model import Config, DocumentMap
 from palimpsest.core import paths as core_paths
-from palimpsest.core.errors import PalimpsestError
+from palimpsest.core.errors import DependencyError, PalimpsestError
 from palimpsest.core.logging import configure as configure_logging
 from palimpsest.corpus import run_corpus
 from palimpsest.office.pipeline import translate_office_document
@@ -389,6 +389,48 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 2
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    if args.host != "127.0.0.1" and not args.i_know:
+        print(
+            f"error: --host {args.host} binds beyond localhost -- pass --i-know to confirm "
+            "you understand this exposes the server (and anything it can reach on your "
+            "filesystem) to your network, not just this machine.",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        import uvicorn
+    except ImportError as e:
+        raise DependencyError(
+            "the 'server' extra is required for `palimpsest serve` -- "
+            "install with `pip install palimpsest-translate[server]`"
+        ) from e
+
+    from palimpsest.server.app import create_app
+
+    config, _entities, _glossary, _documents, _post_rules = load_context(args.config)
+
+    static_dir = None
+    if not args.dev:
+        packaged = Path(__file__).resolve().parent / "server" / "static"
+        static_dir = Path(args.static) if args.static else packaged
+
+    dev_origin = args.dev_origin if args.dev else None
+    app = create_app(config, static_dir=static_dir, dev_origin=dev_origin)
+
+    url = f"http://{args.host}:{args.port}"
+    print(f"palimpsest serving at {url}")
+    if not args.no_browser:
+        import webbrowser
+
+        webbrowser.open(url)
+
+    log_level = "info" if args.verbose else "warning"
+    uvicorn.run(app, host=args.host, port=args.port, log_level=log_level)
+    return 0
+
+
 def _config_to_jsonable(obj):
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         return {f.name: _config_to_jsonable(getattr(obj, f.name)) for f in dataclasses.fields(obj)}
@@ -452,6 +494,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_config = sub.add_parser("config", help="scaffold, show, or validate configuration")
     p_config.add_argument("config_action", choices=("init", "show", "validate"))
     p_config.set_defaults(func=cmd_config)
+
+    p_serve = sub.add_parser("serve", help="run the local web UI (requires the 'server' extra)")
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8765)
+    p_serve.add_argument(
+        "--i-know", dest="i_know", action="store_true",
+        help="required alongside --host to bind beyond localhost",
+    )
+    p_serve.add_argument(
+        "--dev", action="store_true",
+        help="serve the API only, expecting `npm run dev` (Vite) to serve the frontend",
+    )
+    p_serve.add_argument(
+        "--dev-origin", default="http://localhost:5173",
+        help="the Vite dev server's origin, allowed cross-origin only with --dev",
+    )
+    p_serve.add_argument("--static", help="override the built SPA directory")
+    p_serve.add_argument("--no-browser", action="store_true")
+    p_serve.set_defaults(func=cmd_serve)
 
     return parser
 
