@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Anchor, Box, PasswordInput, Radio, Text } from "@mantine/core";
+import { Anchor, Box, PasswordInput, Radio, Text, TextInput } from "@mantine/core";
 import { VENDOR_COLORS } from "../theme.js";
 import { BACKEND_COPY } from "../state.jsx";
 import { useAppState } from "../state.jsx";
 import { useT } from "../i18n.jsx";
-import { MOCK } from "../config.js";
+import { MOCK, getApiBase, setApiBase } from "../config.js";
 import * as api from "../api.js";
 
 const ENV_VAR = { anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY" };
@@ -36,6 +36,8 @@ export default function BackendSelector() {
   const [keyStatus, setKeyStatus] = useState("idle"); // idle | checking | ok | empty
   const [health, setHealth] = useState(null);
   const [healthError, setHealthError] = useState(null);
+  const [addressOpen, setAddressOpen] = useState(false);
+  const [addressDraft, setAddressDraft] = useState(() => getApiBase());
 
   const backend = MOCK ? mockBackend : selectedBackend || "gemini";
   const copy = BACKEND_COPY[backend];
@@ -54,6 +56,13 @@ export default function BackendSelector() {
   }
 
   useEffect(fetchHealth, []);
+
+  function saveAddress() {
+    setApiBase(addressDraft.trim());
+    setAddressDraft(getApiBase());
+    setAddressOpen(false);
+    fetchHealth();
+  }
 
   function selectBackend(v) {
     if (MOCK) {
@@ -118,6 +127,34 @@ export default function BackendSelector() {
           })}
         </Box>
       </Radio.Group>
+
+      {!MOCK && (
+        <div style={{ marginTop: 10 }}>
+          {addressOpen ? (
+            <Box style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+              <TextInput
+                size="xs"
+                style={{ flex: 1 }}
+                label={t("backend.serverAddress")}
+                placeholder="http://127.0.0.1:8765"
+                value={addressDraft}
+                onChange={(e) => setAddressDraft(e.currentTarget.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveAddress()}
+              />
+              <button className="pp-btn-mini" onClick={saveAddress}>
+                {t("backend.serverAddressSave")}
+              </button>
+            </Box>
+          ) : (
+            <Text size="xs" c="dimmed" ff="monospace">
+              {t("backend.serverAddress")}: {getApiBase() || t("backend.serverAddressSameOrigin")}{" "}
+              <Anchor size="xs" component="button" type="button" onClick={() => setAddressOpen(true)}>
+                {t("backend.serverAddressChange")}
+              </Anchor>
+            </Text>
+          )}
+        </div>
+      )}
 
       {copy.needsKey && MOCK && (
         <div style={{ marginTop: 10 }}>

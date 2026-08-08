@@ -1,4 +1,4 @@
-import { API_BASE } from "./config.js";
+import { getApiBase } from "./config.js";
 
 // Thin fetch wrapper for the palimpsest server (src/palimpsest/server/).
 // Every function here mirrors one route in server/routes.py 1:1 -- see
@@ -16,7 +16,7 @@ export class ApiError extends Error {
 async function request(path, options = {}) {
   let res;
   try {
-    res = await fetch(`${API_BASE}${path}`, options);
+    res = await fetch(`${getApiBase()}${path}`, options);
   } catch (e) {
     // Network-level failure (server not running, refused connection) --
     // distinct from an HTTP error status, which the caller may want to
@@ -104,7 +104,7 @@ export function getJob(jobId) {
 // close it themselves on the happy path, only via the returned
 // unsubscribe if they navigate away early.
 export function watchJob(jobId, { onEvent, onDone, onError } = {}) {
-  const source = new EventSource(`${API_BASE}/api/jobs/${jobId}/events`);
+  const source = new EventSource(`${getApiBase()}/api/jobs/${jobId}/events`);
   source.onmessage = (msg) => {
     let payload;
     try {
@@ -127,7 +127,7 @@ export function watchJob(jobId, { onEvent, onDone, onError } = {}) {
 
 export function downloadUrl(jobId, artifact, fileId) {
   const q = fileId ? `?file=${encodeURIComponent(fileId)}` : "";
-  return `${API_BASE}/api/jobs/${jobId}/download/${artifact}${q}`;
+  return `${getApiBase()}/api/jobs/${jobId}/download/${artifact}${q}`;
 }
 
 export function pageUrl(jobId, pageNo, { side = "output", fileId, dpi, v } = {}) {
@@ -139,7 +139,7 @@ export function pageUrl(jobId, pageNo, { side = "output", fileId, dpi, v } = {})
   // unknown params -- bump `v` (e.g. a save counter) after a successful
   // PATCH /layout so the <img> actually re-fetches.
   if (v !== undefined) params.set("v", String(v));
-  return `${API_BASE}/api/jobs/${jobId}/pages/${pageNo}.png?${params}`;
+  return `${getApiBase()}/api/jobs/${jobId}/pages/${pageNo}.png?${params}`;
 }
 
 export function getLayout(jobId, { fileId, page = 0 } = {}) {
