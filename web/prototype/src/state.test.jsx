@@ -6,6 +6,8 @@ vi.mock("./api.js", () => ({
   uploadFile: vi.fn(),
   estimate: vi.fn(),
   createJob: vi.fn(),
+  health: vi.fn(),
+  setKeys: vi.fn(),
 }));
 
 import * as api from "./api.js";
@@ -17,6 +19,12 @@ function renderAppState() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // AppStateProvider probes /api/health on mount (state.jsx's
+  // refreshHealth effect) -- every test needs this to resolve to
+  // something so mount doesn't dangle on an unmocked promise.
+  api.health.mockResolvedValue({
+    version: "0", backend: "gemini", anthropic_key_present: false, gemini_key_present: false,
+  });
 });
 
 afterEach(() => {
@@ -156,5 +164,77 @@ describe("real-mode upload/job state", () => {
     expect(result.current.estimates).toEqual([]);
     expect(result.current.jobId).toBeNull();
     expect(result.current.job).toBeNull();
+  });
+});
+
+describe("health probe + auto-push of a browser-cached key", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("probes /api/health once on mount and exposes the result", async () => {
+    api.health.mockResolvedValue({
+      version: "0", backend: "gemini", anthropic_key_present: true, gemini_key_present: false,
+    });
+    const { result } = renderAppState();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.health).toEqual({
+      version: "0", backend: "gemini", anthropic_key_present: true, gemini_key_present: false,
+    });
+    expect(result.current.healthError).toBeNull();
+  });
+
+  it("pushes a browser-cached key the moment health reports it absent", async () => {
+    localStorage.setItem("pp-key-anthropic", "sk-ant-cached");
+    api.health.mockResolvedValue({
+      version: "0", backend: "gemini", anthropic_key_present: false, gemini_key_present: false,
+    });
+    api.setKeys.mockResolvedValue({
+      version: "0", backend: "gemini", anthropic_key_present: true, gemini_key_present: false,
+    });
+
+    renderAppState();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(api.setKeys).toHaveBeenCalledWith({ anthropic_api_key: "sk-ant-cached" });
+  });
+
+  it("never calls setKeys when nothing is cached", async () => {
+    api.health.mockResolvedValue({
+      version: "0", backend: "gemini", anthropic_key_present: false, gemini_key_present: false,
+    });
+    renderAppState();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(api.setKeys).not.toHaveBeenCalled();
+  });
+
+  it("never calls setKeys when the server already has the key", async () => {
+    localStorage.setItem("pp-key-anthropic", "sk-ant-cached");
+    api.health.mockResolvedValue({
+      version: "0", backend: "gemini", anthropic_key_present: true, gemini_key_present: false,
+    });
+    renderAppState();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(api.setKeys).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import * as api from "./api.js";
+import { MOCK } from "./config.js";
+import { CACHEABLE_BACKENDS, getCachedKey, HEALTH_KEY, KEY_FIELD } from "./keys.js";
 
 // The six product states, in order. "compare" is a sub-view of "results"
 // (reached via an issue's "View on page ->"), not a state of its own --
@@ -25,6 +27,47 @@ export function AppStateProvider({ children }) {
   const [job, setJob] = useState(null); // latest GET /api/jobs/{id} snapshot
   const [apiError, setApiError] = useState(null); // ApiError | null -- drives the "backend unreachable" banner
   const [selectedBackend, setSelectedBackend] = useState(null); // null = server's configured default
+
+  // Lifted out of BackendSelector.jsx/Estimate.jsx (each used to probe
+  // /api/health independently) so there's exactly one probe, consumed by
+  // both, plus the app-level unreachable banner and the auto-push below.
+  const [health, setHealth] = useState(null);
+  const [healthError, setHealthError] = useState(null);
+
+  const refreshHealth = useCallback(() => {
+    if (MOCK) return Promise.resolve(null);
+    setHealthError(null);
+    return api
+      .health()
+      .then((h) => {
+        setHealth(h);
+        // A key typed into the box while no server was reachable (see
+        // keys.js) sits cached in the browser until a server actually
+        // answers -- push it the moment one does, so the user never has
+        // to retype it just because they saved it before starting
+        // `palimpsest serve`. One attempt per backend per successful
+        // probe (not a loop): a failed push just waits for the next
+        // explicit Recheck rather than retrying itself.
+        for (const backend of CACHEABLE_BACKENDS) {
+          const cached = getCachedKey(backend);
+          if (cached && !h[HEALTH_KEY[backend]]) {
+            api
+              .setKeys({ [KEY_FIELD[backend]]: cached })
+              .then(setHealth)
+              .catch(() => {});
+          }
+        }
+        return h;
+      })
+      .catch((e) => {
+        setHealthError(e);
+        throw e;
+      });
+  }, []);
+
+  useEffect(() => {
+    refreshHealth().catch(() => {});
+  }, [refreshHealth]);
 
   // Mirrors the static prototype's goto(): switching screens always closes
   // the compare overlay and resets the "running" animation flag unless the
@@ -126,6 +169,9 @@ export function AppStateProvider({ children }) {
     apiError,
     setApiError,
     resetPipeline,
+    health,
+    healthError,
+    refreshHealth,
   };
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

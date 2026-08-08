@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
 import { Button, Group, Progress, SimpleGrid, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { ESTIMATE } from "../state.jsx";
 import { useAppState } from "../state.jsx";
 import { useT } from "../i18n.jsx";
 import { MOCK } from "../config.js";
-import * as api from "../api.js";
 
 function Cell({ label, value, sub, valueColor, bar }) {
   return (
@@ -46,14 +44,11 @@ function aggregate(estimates) {
 }
 
 export default function Estimate() {
-  const { goto, uploads, estimates, startJob } = useAppState();
+  // health is lifted into AppStateProvider (state.jsx) -- probed once
+  // there and shared with BackendSelector.jsx and the app-level
+  // unreachable banner, rather than each fetching its own.
+  const { goto, uploads, estimates, startJob, health } = useAppState();
   const t = useT();
-  const [backendName, setBackendName] = useState("");
-
-  useEffect(() => {
-    if (MOCK) return;
-    api.health().then((h) => setBackendName(h.backend)).catch(() => {});
-  }, []);
 
   const agg = MOCK
     ? {
@@ -62,7 +57,7 @@ export default function Estimate() {
       }
     : aggregate(estimates);
   const costText = MOCK ? ESTIMATE.cost : agg.usd != null ? `~$${agg.usd.toFixed(2)}` : t("estimate.costUnknown");
-  const modelLabel = MOCK ? ESTIMATE.model : backendName;
+  const modelLabel = MOCK ? ESTIMATE.model : health?.backend ?? "";
   const cacheHitPct = agg.uniqueStrings ? (100 * agg.cacheHits) / agg.uniqueStrings : 0;
   const docCount = MOCK ? 2 : uploads.length;
 

@@ -5,11 +5,7 @@ import { BACKEND_COPY } from "../state.jsx";
 import { useAppState } from "../state.jsx";
 import { T, useT } from "../i18n.jsx";
 import { MOCK, getApiBase, setApiBase } from "../config.js";
-import * as api from "../api.js";
-
-const ENV_VAR = { anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY" };
-const HEALTH_KEY = { anthropic: "anthropic_key_present", gemini: "gemini_key_present" };
-const KEY_FIELD = { anthropic: "anthropic_api_key", gemini: "gemini_api_key" };
+import { clearCachedKey, ENV_VAR, getCachedKey, HEALTH_KEY, setCachedKey } from "../keys.js";
 
 // Part B of the pass-3 plan: vendor colour lives on the selection
 // indicator, not a separate dot. Radio.Card gives the radio semantics and
@@ -26,7 +22,7 @@ const KEY_FIELD = { anthropic: "anthropic_api_key", gemini: "gemini_api_key" };
 // leaked vendor hue would corrupt that language.
 export default function BackendSelector() {
   const t = useT();
-  const { selectedBackend, setSelectedBackend } = useAppState();
+  const { selectedBackend, setSelectedBackend, health, refreshHealth } = useAppState();
 
   // MOCK mode keeps its own local state and the fake key-check flow
   // exactly as before. Real mode reads/writes the shared selectedBackend
@@ -35,51 +31,66 @@ export default function BackendSelector() {
   const [mockBackend, setMockBackend] = useState("gemini");
   const [apiKey, setApiKey] = useState("");
   const [keyStatus, setKeyStatus] = useState("idle"); // idle | checking | ok | empty
-  const [health, setHealth] = useState(null);
-  const [healthError, setHealthError] = useState(null);
   const [addressOpen, setAddressOpen] = useState(false);
   const [addressDraft, setAddressDraft] = useState(() => getApiBase());
   const [entryOpen, setEntryOpen] = useState(false);
   const [entryKey, setEntryKey] = useState("");
   const [entryStatus, setEntryStatus] = useState("idle"); // idle | saving | error
+  const [pwVisible, setPwVisible] = useState(false);
+  const [cachedKeyValue, setCachedKeyValue] = useState(null);
 
   const backend = MOCK ? mockBackend : selectedBackend || "gemini";
   const copy = BACKEND_COPY[backend];
 
-  // Three states, not two: a fetch failure (no /api proxy, server not
-  // started, server restarting) must render distinctly from a reachable
-  // server that genuinely reports the key absent -- otherwise "not set"
-  // shows up for a problem that isn't about the key at all. Exposed as a
-  // named function (not just a mount-time effect) so the "recheck" link
-  // below can refetch after the user actually starts/restarts the server,
-  // rather than requiring a full page reload.
-  function fetchHealth() {
+  // Re-read the browser-cached key whenever the selected backend changes
+  // (each backend has its own cache slot -- see keys.js) rather than
+  // re-reading localStorage on every render. Also resets the entry-form
+  // state, which is otherwise shared across backends by construction (one
+  // component instance, not one per backend) -- caught in manual browser
+  // testing: without this, a failed save on backend A (e.g. attempted
+  // while offline) left entryStatus === "error" sitting in state, and
+  // switching to backend B's freshly-opened, never-touched entry form
+  // showed A's stale error message.
+  useEffect(() => {
     if (MOCK) return;
-    setHealthError(null);
-    api.health().then(setHealth).catch((e) => setHealthError(e));
-  }
-
-  useEffect(fetchHealth, []);
+    setCachedKeyValue(getCachedKey(backend));
+    setEntryOpen(false);
+    setEntryKey("");
+    setEntryStatus("idle");
+    setPwVisible(false);
+  }, [backend]);
 
   function saveAddress() {
     setApiBase(addressDraft.trim());
     setAddressDraft(getApiBase());
     setAddressOpen(false);
-    fetchHealth();
+    refreshHealth();
   }
 
+  // Always caches the key locally first -- this is what makes the box
+  // usable with no server reachable at all, the whole point of this
+  // change. refreshHealth() (state.jsx) already auto-pushes any cached
+  // key the moment a probe finds it absent server-side, so calling it
+  // here (rather than also calling api.setKeys() directly) is enough to
+  // push immediately when a server IS reachable, with no separate/
+  // duplicate push path to keep in sync.
   function submitEntryKey() {
     const value = entryKey.trim();
     if (!value) return;
+    setCachedKey(backend, value);
+    setCachedKeyValue(value);
+    setPwVisible(false); // never leave a just-submitted secret visible on screen
+    setEntryKey("");
+    setEntryOpen(false);
     setEntryStatus("saving");
-    api.setKeys({ [KEY_FIELD[backend]]: value })
-      .then((h) => {
-        setHealth(h);
-        setEntryKey("");
-        setEntryStatus("idle");
-        setEntryOpen(false);
-      })
+    refreshHealth()
+      .then(() => setEntryStatus("idle"))
       .catch(() => setEntryStatus("error"));
+  }
+
+  function forgetKey() {
+    clearCachedKey(backend);
+    setCachedKeyValue(null);
   }
 
   function selectBackend(v) {
@@ -97,10 +108,11 @@ export default function BackendSelector() {
       return;
     }
     setKeyStatus("checking");
+    setPwVisible(false);
     setTimeout(() => setKeyStatus("ok"), 650);
   }
 
-  const keyPresent = health?.[HEALTH_KEY[backend]];
+  const keyPresentOnServer = health?.[HEALTH_KEY[backend]];
 
   return (
     <div>
@@ -176,19 +188,25 @@ export default function BackendSelector() {
 
       {copy.needsKey && MOCK && (
         <div style={{ marginTop: 10 }}>
-          <PasswordInput
-            label={t("backend.apiKeyLabel")}
-            placeholder="AIza..."
-            size="sm"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.currentTarget.value)}
-            rightSectionWidth={64}
-            rightSection={
-              <button className="pp-btn-mini" onClick={checkKey} style={{ marginRight: 4 }}>
-                {t("backend.check")}
-              </button>
-            }
-          />
+          {/* The Check button is a sibling, not a rightSection override --
+              PasswordInput's OWN rightSection is its visibility-toggle eye
+              icon, and overriding it would silently remove the only way to
+              reveal what was typed before submitting. */}
+          <Box style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+            <PasswordInput
+              style={{ flex: 1 }}
+              label={t("backend.apiKeyLabel")}
+              placeholder="AIza..."
+              size="sm"
+              value={apiKey}
+              visible={pwVisible}
+              onVisibilityChange={setPwVisible}
+              onChange={(e) => setApiKey(e.currentTarget.value)}
+            />
+            <button className="pp-btn-mini" onClick={checkKey}>
+              {t("backend.check")}
+            </button>
+          </Box>
           <Text size="xs" mt={7} c={keyStatus === "ok" ? "ok" : keyStatus === "empty" ? "flag" : "dimmed"}>
             {t(`backend.status.${keyStatus}`)}
           </Text>
@@ -201,80 +219,97 @@ export default function BackendSelector() {
         </div>
       )}
 
-      {copy.needsKey && !MOCK && healthError && (
+      {/* Real mode: the key box is ALWAYS visible and usable, regardless
+          of whether a server is reachable right now -- that's the whole
+          point of caching a submitted key locally (keys.js) instead of
+          gating this section behind a health check. Server reachability
+          gets its own app-level banner (App.jsx), not a block here. */}
+      {copy.needsKey && !MOCK && (
         <div style={{ marginTop: 10 }}>
-          <Text size="xs" fw={600} c="flag">
-            <T k="backend.healthUnreachable" />
-          </Text>
-          <Text size="xs" mt={6}>
-            <Anchor size="xs" component="button" type="button" onClick={fetchHealth}>
-              {t("backend.recheck")}
-            </Anchor>
-          </Text>
-        </div>
-      )}
-
-      {copy.needsKey && !MOCK && !healthError && health === null && (
-        <div style={{ marginTop: 10 }}>
-          <Text size="xs" c="dimmed">{t("backend.healthChecking")}</Text>
-        </div>
-      )}
-
-      {copy.needsKey && !MOCK && !healthError && health !== null && keyPresent && !entryOpen && (
-        <div style={{ marginTop: 10 }}>
-          <Text size="xs" c="dimmed" ff="monospace" mb={4}>
-            {ENV_VAR[backend]}
-          </Text>
-          <Text size="xs" fw={600} c="ok">
-            {t("backend.keyDetected")}
-          </Text>
-          <Text size="xs" c="dimmed" mt={6}>
-            {t("backend.keyServerNote")}{" "}
-            <Anchor size="xs" component="button" type="button" onClick={() => setEntryOpen(true)}>
-              {t("backend.keyChange")}
-            </Anchor>
-            {" · "}
-            <Anchor size="xs" component="button" type="button" onClick={fetchHealth}>
-              {t("backend.recheck")}
-            </Anchor>
-          </Text>
-        </div>
-      )}
-
-      {copy.needsKey && !MOCK && !healthError && health !== null && (!keyPresent || entryOpen) && (
-        <div style={{ marginTop: 10 }}>
-          <PasswordInput
-            label={t("backend.apiKeyLabel")}
-            placeholder={backend === "anthropic" ? "sk-ant-..." : "AIza..."}
-            size="sm"
-            value={entryKey}
-            onChange={(e) => { setEntryKey(e.currentTarget.value); setEntryStatus("idle"); }}
-            onKeyDown={(e) => e.key === "Enter" && submitEntryKey()}
-            rightSectionWidth={64}
-            rightSection={
-              <button className="pp-btn-mini" onClick={submitEntryKey} style={{ marginRight: 4 }}>
-                {entryStatus === "saving" ? t("backend.keyEntrySaving") : t("backend.keyEntrySave")}
-              </button>
-            }
-          />
-          <Text size="xs" mt={7} c={entryStatus === "error" ? "flag" : "dimmed"}>
-            {entryStatus === "error"
-              ? t("backend.keyEntryError")
-              : <T k="backend.keyEntryHint" params={{ envVar: ENV_VAR[backend] }} />}
-          </Text>
-          <Text size="xs" mt={4}>
-            {keyPresent && (
-              <>
-                <Anchor size="xs" component="button" type="button" onClick={() => { setEntryOpen(false); setEntryKey(""); setEntryStatus("idle"); }}>
-                  {t("backend.cancel")}
+          {keyPresentOnServer && !entryOpen ? (
+            <>
+              <Text size="xs" c="dimmed" ff="monospace" mb={4}>
+                {ENV_VAR[backend]}
+              </Text>
+              <Text size="xs" fw={600} c="ok">
+                {t("backend.keyDetected")}
+              </Text>
+              <Text size="xs" c="dimmed" mt={6}>
+                {t("backend.keyServerNote")}{" "}
+                <Anchor size="xs" component="button" type="button" onClick={() => setEntryOpen(true)}>
+                  {t("backend.keyChange")}
                 </Anchor>
                 {" · "}
-              </>
-            )}
-            <Anchor size="xs" component="button" type="button" onClick={fetchHealth}>
-              {t("backend.recheck")}
-            </Anchor>
-          </Text>
+                <Anchor size="xs" component="button" type="button" onClick={refreshHealth}>
+                  {t("backend.recheck")}
+                </Anchor>
+              </Text>
+            </>
+          ) : cachedKeyValue && !entryOpen ? (
+            <>
+              <Text size="xs" fw={600} c="dimmed">
+                {t("backend.keyCachedLocally")}
+              </Text>
+              <Text size="xs" mt={6}>
+                <Anchor size="xs" component="button" type="button" onClick={() => setEntryOpen(true)}>
+                  {t("backend.keyChange")}
+                </Anchor>
+                {" · "}
+                <Anchor size="xs" component="button" type="button" onClick={forgetKey}>
+                  {t("backend.keyForget")}
+                </Anchor>
+                {" · "}
+                <Anchor size="xs" component="button" type="button" onClick={refreshHealth}>
+                  {t("backend.recheck")}
+                </Anchor>
+              </Text>
+            </>
+          ) : (
+            <>
+              {/* Save is a sibling, not a rightSection override -- see the
+                  MOCK-mode block above for why that matters here. */}
+              <Box style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+                <PasswordInput
+                  style={{ flex: 1 }}
+                  label={t("backend.apiKeyLabel")}
+                  placeholder={backend === "anthropic" ? "sk-ant-..." : "AIza..."}
+                  size="sm"
+                  value={entryKey}
+                  visible={pwVisible}
+                  onVisibilityChange={setPwVisible}
+                  onChange={(e) => {
+                    setEntryKey(e.currentTarget.value);
+                    setEntryStatus("idle");
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && submitEntryKey()}
+                />
+                <button className="pp-btn-mini" onClick={submitEntryKey}>
+                  {entryStatus === "saving" ? t("backend.keyEntrySaving") : t("backend.keyEntrySave")}
+                </button>
+              </Box>
+              <Text size="xs" mt={7} c={entryStatus === "error" ? "flag" : "dimmed"}>
+                {entryStatus === "error"
+                  ? t("backend.keyEntryError")
+                  : <T k="backend.keyEntryHint" params={{ envVar: ENV_VAR[backend] }} />}
+              </Text>
+              <Text size="xs" mt={4}>
+                {(keyPresentOnServer || cachedKeyValue) && (
+                  <>
+                    <Anchor
+                      size="xs" component="button" type="button"
+                      onClick={() => { setEntryOpen(false); setEntryKey(""); setEntryStatus("idle"); }}
+                    >
+                      {t("backend.cancel")}
+                    </Anchor>
+                    {" · "}
+                  </>
+                )}
+                <Anchor size="xs" component="button" type="button" onClick={refreshHealth}>
+                  {t("backend.recheck")}
+                </Anchor>
+              </Text>
+            </>
+          )}
         </div>
       )}
     </div>
