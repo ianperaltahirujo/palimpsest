@@ -56,6 +56,22 @@ See `examples/palimpsest.toml`, `examples/entities.example.toml`, and
 `examples/documents.example.toml` for the file shapes, and
 [`docs/configuration.md`](docs/configuration.md) for the full reference.
 
+### Web UI
+
+```bash
+pip install "palimpsest-translate[server]"
+python tools/build_frontend.py   # builds web/prototype and stages it into the package
+palimpsest serve                 # http://127.0.0.1:8765, opens your browser
+```
+
+Local-first, single-user, no accounts: everything runs on your own machine
+and binds to loopback by default (`--host` requires an explicit `--i-know`
+to bind wider). API keys are read from the environment exactly like the
+CLI — never accepted over HTTP, never stored in a job record. See
+[`web/prototype/README.md`](web/prototype/README.md) for the frontend
+itself, including `--dev` mode for working on the UI against a live API
+without rebuilding on every change.
+
 ## Why this exists, not just what it does
 
 Generic "translate this PDF" tools tend to do one of two things badly:

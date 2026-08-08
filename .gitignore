@@ -46,3 +46,11 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+
+# --- JS (web/prototype) ---------------------------------------------------
+node_modules/
+
+# The built SPA, copied here by tools/build_frontend.py for `palimpsest
+# serve` to mount in production mode -- a build artifact of
+# web/prototype/dist, not source.
+src/palimpsest/server/static/

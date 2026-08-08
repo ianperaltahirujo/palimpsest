@@ -23,7 +23,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install package (dev)
-        run: pip install -e ".[dev,anthropic]"
+        run: pip install -e ".[dev,anthropic,server]"
 
       - name: Ruff lint
         run: ruff check .
@@ -38,6 +38,32 @@ jobs:
         run: python tools/scrub_check.py --history
         env:
           PALIMPSEST_DENYLIST: ${{ secrets.PALIMPSEST_DENYLIST_PATH || '' }}
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/prototype
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/prototype/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build (production, real-mode default)
+        run: npm run build
 
   gitleaks:
     runs-on: ubuntu-latest
