@@ -22,11 +22,14 @@ jobs:
       run:
         working-directory: web/prototype
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      # node-version-file, not a hardcoded version -- see ci.yml's matching
+      # comment for why (jsdom/undici's engine ranges exclude Node 20;
+      # web/prototype/.nvmrc is the single place this is pinned).
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version-file: web/prototype/.nvmrc
           cache: "npm"
           cache-dependency-path: web/prototype/package-lock.json
 

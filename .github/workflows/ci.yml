@@ -14,7 +14,7 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0  # scrub_check --history needs full log
 
@@ -45,11 +45,18 @@ jobs:
       run:
         working-directory: web/prototype
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      # node-version-file (not a hardcoded "20") so the Node version lives
+      # in exactly one place (web/prototype/.nvmrc) -- a hardcoded pin here
+      # silently drifted from what jsdom/undici actually require and this
+      # job failed on Node 20 for a while before anyone noticed (jsdom 30 ->
+      # undici 8 both declare engines that exclude Node 20; npm ci only
+      # warns on EBADENGINE, so install succeeds and the failure only
+      # surfaces inside the vitest worker at test time).
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version-file: web/prototype/.nvmrc
           cache: "npm"
           cache-dependency-path: web/prototype/package-lock.json
 
@@ -68,7 +75,7 @@ jobs:
   gitleaks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
