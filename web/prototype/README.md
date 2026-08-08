@@ -22,12 +22,18 @@ bundle, so opening `index.html` by double-click doesn't work.
 
 - **Real (default).** Talks to the palimpsest server over `/api/...`.
   Run `palimpsest serve --dev` (binds the API only, no static mount) in
-  one terminal and `npm run dev` in another; the two run on different
-  ports (5173 for Vite, 8765 for the API by default), so the frontend
-  needs `VITE_API_BASE` pointed at the server:
+  one terminal and `npm run dev` in another. `vite.config.js` proxies
+  `/api` to `http://127.0.0.1:8765` (the CLI's default `--port`), so this
+  works with zero configuration — no env var needed, and no
+  `--dev-origin` allowlist entry either, since the proxy keeps the
+  forwarded `Host` header as Vite's own origin (`changeOrigin: false`),
+  which `server/security.py`'s `OriginCheckMiddleware` sees as same-origin.
+
+  Running the server on a non-default port needs `VITE_API_BASE` instead,
+  which bypasses the proxy entirely (`api.js` builds absolute URLs):
 
   ```
-  VITE_API_BASE=http://localhost:8765 npm run dev
+  VITE_API_BASE=http://localhost:9000 npm run dev
   ```
 
   In production, `palimpsest serve` (no `--dev`) mounts the built SPA and
