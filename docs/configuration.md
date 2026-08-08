@@ -87,6 +87,13 @@ for the pricing/model tradeoffs, why Gemini is the default despite Claude
 being the stronger model, and how prompt caching and the Batches API
 affect cost on a large corpus run.
 
+Every `palimpsest` command loads a `.env` file (`ANTHROPIC_API_KEY=...`,
+`GEMINI_API_KEY=...`, one per line) from the current directory automatically
+if one exists — copy `.env.example` to `.env` and fill it in as an
+alternative to exporting the variables in your shell every session. A
+value already exported in your shell always wins over `.env`. `.env` is
+gitignored; never commit it.
+
 ## Thresholds
 
 `[thresholds]` values (bold-detection stem ratio, OCR size-jitter

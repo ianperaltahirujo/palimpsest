@@ -21,6 +21,9 @@ That is only safe because of what else is true:
   CLI already does (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) and are
   never accepted over HTTP, stored in a job record, or included in any
   response body -- `/api/health` reports only whether each is present.
+  A `.env` file, if present, is loaded into that same environment by
+  `cli.py::main()` before `serve` even starts -- a convenience for
+  populating the environment, not a second place a key can come from.
 
 None of this is adequate for a hosted, multi-user deployment. It is
 adequate for what this is: a local tool one person runs against their

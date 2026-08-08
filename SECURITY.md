@@ -16,4 +16,7 @@ vulnerability) rather than a public issue.
   `docs/configuration.md` before pointing it at sensitive documents.
 - API keys are read only from environment variables
   (`ANTHROPIC_API_KEY`), never from a config file or CLI argument, to
-  avoid them landing in shell history or process listings.
+  avoid them landing in shell history or process listings. A gitignored
+  `.env` file is one supported way to populate those variables (loaded by
+  the CLI on startup) — it is still an environment-variable source, not a
+  config file the tool reads keys from directly.

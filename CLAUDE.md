@@ -111,6 +111,9 @@ same-origin requests — browsers do not let a page suppress it. Don't reintrodu
 
 API keys are read from the server process's own environment (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`)
 and never accepted over HTTP or stored in a job record — `GET /api/health` reports only whether each is present.
+`cli.py::main()` loads a `.env` file (via `python-dotenv`, `override=False` so a real exported var always wins)
+before dispatching to any subcommand including `serve` — this is a convenience for populating that same
+environment, not a second credential path; a key still never comes from `palimpsest.toml`, argv, or HTTP.
 
 Jobs run on one `ThreadPoolExecutor(max_workers=1)` per server process (`server/jobs.py`) — deliberate, not a
 missing optimization; a local single-user tool has no reason to translate concurrently. `JobRegistry` persists each
