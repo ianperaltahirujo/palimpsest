@@ -35,14 +35,25 @@ export default function BackendSelector() {
   const [apiKey, setApiKey] = useState("");
   const [keyStatus, setKeyStatus] = useState("idle"); // idle | checking | ok | empty
   const [health, setHealth] = useState(null);
+  const [healthError, setHealthError] = useState(null);
 
   const backend = MOCK ? mockBackend : selectedBackend || "gemini";
   const copy = BACKEND_COPY[backend];
 
-  useEffect(() => {
+  // Three states, not two: a fetch failure (no /api proxy, server not
+  // started, server restarting) must render distinctly from a reachable
+  // server that genuinely reports the key absent -- otherwise "not set"
+  // shows up for a problem that isn't about the key at all. Exposed as a
+  // named function (not just a mount-time effect) so the "recheck" link
+  // below can refetch after the user actually starts/restarts the server,
+  // rather than requiring a full page reload.
+  function fetchHealth() {
     if (MOCK) return;
-    api.health().then(setHealth).catch(() => {});
-  }, []);
+    setHealthError(null);
+    api.health().then(setHealth).catch((e) => setHealthError(e));
+  }
+
+  useEffect(fetchHealth, []);
 
   function selectBackend(v) {
     if (MOCK) {
@@ -135,16 +146,36 @@ export default function BackendSelector() {
         </div>
       )}
 
-      {copy.needsKey && !MOCK && (
+      {copy.needsKey && !MOCK && healthError && (
+        <div style={{ marginTop: 10 }}>
+          <Text size="xs" fw={600} c="flag">
+            {t("backend.healthUnreachable")}
+          </Text>
+          <Text size="xs" mt={6}>
+            <Anchor size="xs" component="button" type="button" onClick={fetchHealth}>
+              {t("backend.recheck")}
+            </Anchor>
+          </Text>
+        </div>
+      )}
+
+      {copy.needsKey && !MOCK && !healthError && (
         <div style={{ marginTop: 10 }}>
           <Text size="xs" c="dimmed" ff="monospace" mb={4}>
             {ENV_VAR[backend]}
           </Text>
-          <Text size="xs" fw={600} c={keyPresent ? "ok" : "flag"}>
-            {keyPresent ? t("backend.keyDetected") : t("backend.keyMissing")}
+          <Text size="xs" fw={600} c={health === null ? "dimmed" : keyPresent ? "ok" : "flag"}>
+            {health === null
+              ? t("backend.healthChecking")
+              : keyPresent
+                ? t("backend.keyDetected")
+                : t("backend.keyMissing")}
           </Text>
           <Text size="xs" c="dimmed" mt={6}>
-            {t("backend.keyServerNote")}
+            {t("backend.keyServerNote")}{" "}
+            <Anchor size="xs" component="button" type="button" onClick={fetchHealth}>
+              {t("backend.recheck")}
+            </Anchor>
           </Text>
         </div>
       )}
