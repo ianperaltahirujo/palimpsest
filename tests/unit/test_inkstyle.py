@@ -4,7 +4,7 @@ from palimpsest.pdf import inkstyle
 from palimpsest.pdf.layout import Para
 from tests.fixtures import synth
 
-STYLE = ("helv", 14.0, False, False, (0, 0, 0))
+STYLE = ("helv", 14.0, False, False, (0, 0, 0), False, None)
 
 
 def _make_para(text: str, rect: fitz.Rect, origin: tuple[float, float]) -> Para:

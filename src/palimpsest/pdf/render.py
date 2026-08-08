@@ -46,6 +46,14 @@ _LEADING_MARKER_RE = re.compile(r"^\s*([•●○◦▪§·]|[a-zA-Z]\)|\d{1,2}[
 MIN_SCALE = 0.72  # below this, shrinking is more disfiguring than reflowing
 JUSTIFY_MAX_STRETCH = 2.6  # give up on justifying a line rather than tear it apart
 
+# Underline/highlight geometry, as fractions of the drawn font size --
+# these two marks only ever come from edit-mode edits (style positions 5
+# and 6; see core.ir.Run), never from source-PDF extraction.
+UNDERLINE_OFFSET = 0.12  # below the baseline
+UNDERLINE_THICKNESS = 0.07
+HIGHLIGHT_RISE = 0.80  # above the baseline, approximating cap height
+HIGHLIGHT_DROP = 0.22  # below the baseline, for descenders
+
 # Face used when the source names no real typeface -- i.e. an OCR text
 # layer, where every span claims to be a placeholder font. Overridable per
 # RenderContext (and per document via config `[fonts].scan_default`).
@@ -71,7 +79,7 @@ class RenderContext:
         for wrapping are those of the face actually drawn -- measuring in
         regular and drawing in bold would make every bold line overrun
         its box."""
-        fontname, _size, bold, ital, _color = style
+        fontname, _size, bold, ital, _color, _underline, _highlight = style
         key = (fontname, bold, ital, self.default_scan_family)
         if key not in self._font_cache:
             self._font_cache[key] = self.font_resolver.font_object(
@@ -228,11 +236,20 @@ def draw_paragraph(
         for j, (word, style) in enumerate(line):
             if j:
                 x += ctx.measure(" ", style, fitted) + extra_per_gap
+            word_w = ctx.measure(word, style, fitted)
+            underline, highlight = style[5], style[6]
+            color = style[4]
+            if highlight:
+                # Drawn before the text so the glyphs paint on top of it,
+                # not the other way around.
+                hi_rect = fitz.Rect(
+                    x, y - fitted * HIGHLIGHT_RISE, x + word_w, y + fitted * HIGHLIGHT_DROP
+                )
+                page.draw_rect(hi_rect, color=None, fill=highlight, width=0, overlay=True)
             alias = ctx.font_resolver.alias_for(
                 page, style[0], bold=style[2], italic=style[3],
                 default_family=ctx.default_scan_family,
             )
-            color = style[4]
             try:
                 page.insert_text(
                     (x, y), word, fontname=alias, fontsize=fitted, color=color, overlay=True
@@ -242,7 +259,13 @@ def draw_paragraph(
                     (x, y), word, fontname=base14(style[2], style[3]),
                     fontsize=fitted, color=color, overlay=True,
                 )
-            x += ctx.measure(word, style, fitted)
+            if underline:
+                uy = y + fitted * UNDERLINE_OFFSET
+                page.draw_line(
+                    (x, uy), (x + word_w, uy), color=color,
+                    width=max(0.4, fitted * UNDERLINE_THICKNESS), overlay=True,
+                )
+            x += word_w
         drawn += 1
         y += lead
 

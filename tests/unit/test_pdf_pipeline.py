@@ -29,8 +29,8 @@ from tests.fixtures.fake_backend import FakeBackend
 
 ENTITIES = ("Grupo Meridian", "Banco Litoral")
 
-STYLE_BOLD = ("Helvetica", 11.0, True, False, (0.0, 0.0, 0.0))
-STYLE_REGULAR = ("Helvetica", 11.0, False, False, (0.0, 0.0, 0.0))
+STYLE_BOLD = ("Helvetica", 11.0, True, False, (0.0, 0.0, 0.0), False, None)
+STYLE_REGULAR = ("Helvetica", 11.0, False, False, (0.0, 0.0, 0.0), False, None)
 
 
 def _para(text: str, runs: list[dict]) -> layout.Para:

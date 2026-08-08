@@ -12,8 +12,10 @@ def _ctx() -> RenderContext:
     return RenderContext(font_resolver=FontResolver(use_bundled_fallback=False))
 
 
-STYLE = ("helv", 12.0, False, False, (0.0, 0.0, 0.0))
-BOLD_STYLE = ("helv", 12.0, True, False, (0.0, 0.0, 0.0))
+STYLE = ("helv", 12.0, False, False, (0.0, 0.0, 0.0), False, None)
+BOLD_STYLE = ("helv", 12.0, True, False, (0.0, 0.0, 0.0), False, None)
+UNDERLINE_STYLE = ("helv", 12.0, False, False, (0.0, 0.0, 0.0), True, None)
+HIGHLIGHT_STYLE = ("helv", 12.0, False, False, (0.0, 0.0, 0.0), False, (1.0, 0.9, 0.5))
 
 
 def test_fit_paragraph_returns_original_size_when_it_fits():
@@ -89,6 +91,40 @@ def test_draw_paragraph_actually_draws_text_on_the_page():
     segments = [("Approved translation text", STYLE)]
     draw_paragraph(ctx, page, para, segments, para.rect)
     assert "Approved" in page.get_text()
+
+
+def test_draw_paragraph_draws_highlight_rect_behind_marked_words():
+    ctx = _ctx()
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=200)
+    para = _make_para("Marked word")
+    segments = [("Marked word", HIGHLIGHT_STYLE)]
+    draw_paragraph(ctx, page, para, segments, para.rect)
+    fills = [d["fill"] for d in page.get_drawings() if d.get("fill")]
+    assert fills, "expected a filled rect for a word with a highlight style"
+    assert all(abs(c - e) < 1e-3 for c, e in zip(fills[0], HIGHLIGHT_STYLE[6], strict=True))
+
+
+def test_draw_paragraph_draws_no_highlight_when_style_has_none():
+    ctx = _ctx()
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=200)
+    para = _make_para("Plain word")
+    segments = [("Plain word", STYLE)]
+    draw_paragraph(ctx, page, para, segments, para.rect)
+    fills = [d["fill"] for d in page.get_drawings() if d.get("fill")]
+    assert not fills
+
+
+def test_draw_paragraph_draws_underline_stroke_for_marked_words():
+    ctx = _ctx()
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=200)
+    para = _make_para("Underlined word")
+    segments = [("Underlined word", UNDERLINE_STYLE)]
+    draw_paragraph(ctx, page, para, segments, para.rect)
+    strokes = [d for d in page.get_drawings() if d.get("items") and not d.get("fill")]
+    assert any(item[0] == "l" for d in strokes for item in d["items"])
 
 
 def test_draw_paragraph_justify_distributes_space_between_words():

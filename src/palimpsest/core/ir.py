@@ -40,6 +40,11 @@ class Run:
     bold: bool
     italic: bool
     color: tuple[float, float, float]
+    underline: bool = False
+    highlight: tuple[float, float, float] | None = None
+    """Both default False/None because source-PDF extraction never
+    produces either -- they only ever come from the web UI's edit mode
+    (see `pdf.reflow`), which is also the only place that draws them."""
 
 
 @dataclass(frozen=True)
@@ -111,6 +116,7 @@ def to_json(doc: Document, *, indent: int | None = 2) -> str:
 
 
 def _run_from_dict(d: dict[str, Any]) -> Run:
+    highlight = d.get("highlight")
     return Run(
         text=d["text"],
         font=d["font"],
@@ -118,6 +124,8 @@ def _run_from_dict(d: dict[str, Any]) -> Run:
         bold=d["bold"],
         italic=d["italic"],
         color=tuple(d["color"]),
+        underline=d.get("underline", False),
+        highlight=tuple(highlight) if highlight else None,
     )
 
 

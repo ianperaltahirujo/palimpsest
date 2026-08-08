@@ -219,9 +219,14 @@ def _build_runs(lines: list[dict], size_jitter_tolerance: float = _SIZE_JITTER_T
                     last["text"] += t
                     joined = True
             if not joined:
+                # underline/highlight (positions 5-6) are always False/None
+                # here -- extraction reads only the SOURCE PDF, which never
+                # carries either. They only ever get set by the web UI's
+                # edit mode (see `pdf.reflow`).
                 style = (
                     sp.get("font", ""), round(size, 1),
                     span_is_bold(sp), span_is_italic(sp), span_color(sp),
+                    False, None,
                 )
                 runs.append({"text": t, "style": style})
                 run_ref_size.append(size)
@@ -682,8 +687,11 @@ def available_rect(
 
 
 def _run_to_ir(run: dict) -> ir.Run:
-    font, size, bold, italic, color = run["style"]
-    return ir.Run(text=run["text"], font=font, size=size, bold=bold, italic=italic, color=color)
+    font, size, bold, italic, color, underline, highlight = run["style"]
+    return ir.Run(
+        text=run["text"], font=font, size=size, bold=bold, italic=italic, color=color,
+        underline=underline, highlight=highlight,
+    )
 
 
 def _rect_to_ir(r: fitz.Rect | None) -> ir.Rect | None:

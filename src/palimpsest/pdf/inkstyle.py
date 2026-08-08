@@ -172,7 +172,7 @@ def annotate_bold(page: fitz.Page, paras, thresholds: InkThresholds | None = Non
         if r is None or r < thresholds.bold_stem_ratio:
             continue
         for run in p.runs:
-            font, size, _bold, ital, color = run["style"]
-            run["style"] = (font, size, True, ital, color)
+            font, size, _bold, ital, color, underline, highlight = run["style"]
+            run["style"] = (font, size, True, ital, color, underline, highlight)
         marked += 1
     return marked
