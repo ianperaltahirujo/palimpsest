@@ -417,7 +417,15 @@ def test_allow_origin_still_rejects_any_other_cross_origin_request(tmp_path):
     assert resp.status_code == 403
 
 
-def test_private_network_access_preflight_gets_the_extra_header_only_when_allowlisted(tmp_path):
+def test_private_network_access_preflight_succeeds_when_allowlisted(tmp_path):
+    # Status code matters as much as the header: Starlette's CORSMiddleware
+    # treats a preflight carrying Access-Control-Request-Private-Network as
+    # a FAILURE (400 "Disallowed CORS private-network") unless
+    # allow_private_network=True is passed to it -- a real browser reading
+    # this response cares about the 2xx status just as much as the header,
+    # so a test that only checks the header can pass while the preflight
+    # is still actually rejected. Confirmed with a real curl preflight
+    # against a running server before trusting this assertion.
     config = _config(tmp_path)
     app = create_app(
         config, backend_factory=_fake_backend_factory,
@@ -432,6 +440,7 @@ def test_private_network_access_preflight_gets_the_extra_header_only_when_allowl
                 "Access-Control-Request-Private-Network": "true",
             },
         )
+    assert resp.status_code == 200
     assert resp.headers.get("access-control-allow-private-network") == "true"
 
 

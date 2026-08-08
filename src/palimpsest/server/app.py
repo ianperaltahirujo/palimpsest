@@ -21,8 +21,9 @@ That is only safe because of what else is true:
 - `OriginCheckMiddleware` (see `security.py`) rejects any mutating
   cross-origin request regardless of CORS config, as a second,
   independent layer -- CORS is what a *compliant* browser enforces
-  client-side; this is enforced server-side. `PrivateNetworkAccessMiddleware`
-  (also `security.py`) answers the extra preflight check Chrome requires
+  client-side; this is enforced server-side. `CORSMiddleware`'s
+  `allow_private_network=True` (below, only set alongside a non-empty
+  `extra_origins`) answers the extra preflight check Chrome requires
   before a public HTTPS origin (like a GitHub Pages URL) may reach a
   loopback target like this server at all.
 - API keys are read from the process environment exactly the way the
@@ -62,7 +63,7 @@ from starlette.middleware.cors import CORSMiddleware
 from palimpsest.config import loader as config_loader
 from palimpsest.config.model import Config, DocumentMap
 from palimpsest.server.jobs import JobRegistry
-from palimpsest.server.security import OriginCheckMiddleware, PrivateNetworkAccessMiddleware
+from palimpsest.server.security import OriginCheckMiddleware
 from palimpsest.server.uploads import UploadedFile
 from palimpsest.text import postfix
 from palimpsest.text.glossary import Glossary
@@ -171,17 +172,25 @@ def create_app(
 
     app.add_middleware(OriginCheckMiddleware, allowed_origins=extra_origins)
     if extra_origins:
-        # CORSMiddleware answers the normal preflight (ACAO/ACAM/ACAH);
-        # PrivateNetworkAccessMiddleware must be added AFTER it so it
-        # wraps CORSMiddleware (Starlette's outermost layer = last
-        # added) and can add the one extra header Chrome requires before
-        # a public HTTPS origin may reach this loopback server at all --
-        # see security.py.
+        # allow_private_network=True answers the extra CORS-preflight
+        # check Chrome requires before a public HTTPS origin may reach a
+        # loopback target (this server) at all. Without it, Starlette's
+        # own CORSMiddleware treats a preflight that carries
+        # Access-Control-Request-Private-Network as a FAILURE and
+        # returns 400 "Disallowed CORS private-network" -- verified by a
+        # real curl preflight against a running server, not just
+        # inspecting this call. (An earlier version of this code hand-
+        # rolled a middleware to bolt the response header on afterward;
+        # that left the 400 status untouched, which a real browser would
+        # treat as a rejected preflight regardless of headers present --
+        # don't reintroduce that. Starlette added native support for
+        # this; check `allow_private_network` is still accepted by
+        # `starlette.middleware.cors.CORSMiddleware` before removing
+        # this parameter in a future refactor.)
         app.add_middleware(
             CORSMiddleware, allow_origins=list(extra_origins),
-            allow_methods=["*"], allow_headers=["*"],
+            allow_methods=["*"], allow_headers=["*"], allow_private_network=True,
         )
-        app.add_middleware(PrivateNetworkAccessMiddleware)
 
     app.include_router(router)
 

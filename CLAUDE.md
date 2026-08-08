@@ -118,10 +118,14 @@ setting, not a build-time constant, since one public build is shared by every us
 back at `http://127.0.0.1:<port>`. That's a genuinely cross-origin browser tab reaching a loopback server, which
 needs two things beyond `OriginCheckMiddleware`'s existing allowlist: `--allow-origin <exact origin>` on
 `palimpsest serve` (never guessed or wildcarded — the caller must know and pass the real origin), and
-`PrivateNetworkAccessMiddleware` (`security.py`), which answers the extra CORS-preflight check Chrome requires
-before a public HTTPS origin may reach a private-network/loopback target at all — added to the app only alongside
-`CORSMiddleware`, i.e. only when `extra_origins` is non-empty, and must be added AFTER `CORSMiddleware` (Starlette
-wraps outermost = last-added) so it can extend the preflight response `CORSMiddleware` already built.
+`CORSMiddleware`'s `allow_private_network=True` (Starlette's own native support, passed in `app.create_app`
+whenever `extra_origins` is non-empty), which answers the extra CORS-preflight check Chrome requires before a
+public HTTPS origin may reach a private-network/loopback target at all. Without it, Starlette's `CORSMiddleware`
+treats that preflight as a FAILURE and returns 400 even with everything else configured correctly — verified with
+a real curl preflight against a running server, not just by reading the parameter's docs. (An earlier version of
+this hand-rolled a middleware to bolt the response header on after the fact, which left the 400 status untouched
+— a real browser evaluating a preflight looks at the status code, not just header presence. Don't reintroduce
+that; use `allow_private_network=True` on `CORSMiddleware` itself.)
 
 API keys are read from the server process's own environment (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`)
 and are never stored in a job record or included in any response body — `GET /api/health` reports only whether

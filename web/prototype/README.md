@@ -54,8 +54,9 @@ bundle, so opening `index.html` by double-click doesn't work.
   `palimpsest serve --allow-origin <this build's exact origin>` (see the
   root `docs/configuration.md`) — a genuinely cross-origin browser tab
   reaching a loopback server, which additionally requires Chrome's
-  Private Network Access preflight to succeed
-  (`server/security.py`'s `PrivateNetworkAccessMiddleware`).
+  Private Network Access preflight to succeed (Starlette's own
+  `CORSMiddleware(..., allow_private_network=True)`, set automatically
+  whenever `--allow-origin` is used — see `server/app.py`).
 
 - **Mock (`VITE_MOCK=1`).** The original design prototype: fixtures from
   `src/state.jsx`, zero network calls, the "prototype states" dev switcher
