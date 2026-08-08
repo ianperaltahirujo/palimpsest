@@ -148,6 +148,37 @@ def test_translate_connection_error_is_failed_status():
     assert result.status == "failed"
 
 
+def _missing_credentials_error():
+    # The real anthropic SDK raises exactly this -- a bare TypeError, not
+    # an AnthropicError subclass -- when it can't resolve api_key/
+    # auth_token/credentials from the environment. Reproduced verbatim
+    # (not just any TypeError) since _is_missing_credentials matches on
+    # message text specifically to avoid swallowing an unrelated bug.
+    return TypeError(
+        "Could not resolve authentication method. Expected one of api_key, "
+        "auth_token, or credentials to be set. Or for one of the `X-Api-Key` "
+        "or `Authorization` headers to be explicitly omitted"
+    )
+
+
+def test_translate_missing_credentials_is_failed_status_not_a_crash():
+    client = FakeAnthropicClient(raise_on_create=_missing_credentials_error())
+    backend = AnthropicBackend(client=client)
+    result = backend.translate("hola", _ctx())
+    assert result.status == "failed"
+    assert "credentials" in (result.detail or "")
+
+
+def test_translate_unrelated_type_error_still_propagates():
+    # A TypeError from a real bug in our own call arguments must not be
+    # silently folded into "translation failed" just because it shares a
+    # type with the credentials-resolution error.
+    client = FakeAnthropicClient(raise_on_create=TypeError("unexpected keyword argument 'foo'"))
+    backend = AnthropicBackend(client=client)
+    with pytest.raises(TypeError, match="unexpected keyword"):
+        backend.translate("hola", _ctx())
+
+
 def test_translate_malformed_json_is_failed_status():
     client = FakeAnthropicClient(responses=[malformed_message("not json")])
     backend = AnthropicBackend(client=client)
@@ -195,6 +226,13 @@ def test_translate_batch_sync_refusal_marks_all_units_refused():
     backend = AnthropicBackend(client=client)
     results = backend.translate_batch(["uno", "dos", "tres"], _ctx())
     assert [r.status for r in results] == ["refused", "refused", "refused"]
+
+
+def test_translate_batch_sync_missing_credentials_is_failed_for_every_unit():
+    client = FakeAnthropicClient(raise_on_create=_missing_credentials_error())
+    backend = AnthropicBackend(client=client)
+    results = backend.translate_batch(["uno", "dos"], _ctx())
+    assert [r.status for r in results] == ["failed", "failed"]
 
 
 # -- translate_batch(): async Batches API path -------------------------------

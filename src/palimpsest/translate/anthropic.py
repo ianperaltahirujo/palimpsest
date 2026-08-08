@@ -166,6 +166,21 @@ def _verify(source: str, english: str, entities: Sequence[str]) -> bool:
     return Counter(_NUMBER_RE.findall(source)) == Counter(_NUMBER_RE.findall(english))
 
 
+def _is_missing_credentials(e: Exception) -> bool:
+    """`anthropic.Anthropic()` is lenient at construction time -- it only
+    resolves credentials (api_key / auth_token / an `ant auth login`
+    profile) lazily, on the first real request, and raises a bare
+    `TypeError` if none were found. That's neither `APIConnectionError`
+    nor `APIStatusError` (no request was ever sent), so it isn't caught
+    by the except clauses those satisfy -- without this check it
+    propagates all the way up and crashes the whole document instead of
+    being recorded as one failed unit. Matched on message text, not just
+    `TypeError`, since a TypeError from a real bug in an SDK call's own
+    arguments should still surface as a crash, not get silently folded
+    into "translation failed"."""
+    return isinstance(e, TypeError) and "authentication method" in str(e)
+
+
 class AnthropicBackend:
     name = "anthropic"
     prefers_batch = True
@@ -280,6 +295,12 @@ class AnthropicBackend:
             return TranslationResult(text=None, status="failed", detail=str(e))
         except anthropic.APIStatusError as e:
             return TranslationResult(text=None, status="failed", detail=str(e))
+        except TypeError as e:
+            if not _is_missing_credentials(e):
+                raise
+            return TranslationResult(
+                text=None, status="failed", detail=f"no Anthropic credentials configured: {e}"
+            )
 
         if response.stop_reason == "refusal":
             detail = response.stop_details.category if response.stop_details else None
@@ -334,6 +355,11 @@ class AnthropicBackend:
             return [
                 TranslationResult(text=None, status="failed", detail=str(e)) for _ in texts
             ]
+        except TypeError as e:
+            if not _is_missing_credentials(e):
+                raise
+            msg = f"no Anthropic credentials configured: {e}"
+            return [TranslationResult(text=None, status="failed", detail=msg) for _ in texts]
 
         if response.stop_reason == "refusal":
             detail = response.stop_details.category if response.stop_details else None
@@ -405,6 +431,11 @@ class AnthropicBackend:
             batch = self._client.messages.batches.create(requests=requests)
         except (anthropic.APIConnectionError, anthropic.APIStatusError) as e:
             return [TranslationResult(text=None, status="failed", detail=str(e)) for _ in texts]
+        except TypeError as e:
+            if not _is_missing_credentials(e):
+                raise
+            msg = f"no Anthropic credentials configured: {e}"
+            return [TranslationResult(text=None, status="failed", detail=msg) for _ in texts]
 
         deadline = time.monotonic() + self.batch_poll_timeout
         while True:
@@ -466,6 +497,10 @@ class AnthropicBackend:
                 total_input += counted.input_tokens
         except (anthropic.APIConnectionError, anthropic.APIStatusError) as e:
             raise BackendError(f"could not estimate cost: {e}") from e
+        except TypeError as e:
+            if not _is_missing_credentials(e):
+                raise
+            raise BackendError(f"no Anthropic credentials configured: {e}") from e
         # Output tokens are unknown until translation happens; translated
         # prose is close in length to source, so input count is used as
         # the output estimate too. Documented as an estimate, not a bound.

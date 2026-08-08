@@ -10,7 +10,12 @@ from palimpsest.config.model import (
 from palimpsest.text.glossary import Glossary
 from palimpsest.translate.backend import TranslationContext, TranslationResult
 from palimpsest.translate.google import GoogleBackend
-from palimpsest.translate.registry import FallbackBackend, build_translator, make_backend
+from palimpsest.translate.registry import (
+    FallbackBackend,
+    _has_credentials,
+    build_translator,
+    make_backend,
+)
 from palimpsest.translate.translator import Translator
 from tests.fixtures.fake_backend import FailingBackend, FakeBackend
 
@@ -41,6 +46,50 @@ def test_make_backend_wires_google_config_fields():
 def test_make_backend_no_fallback_when_same_as_primary():
     backend = make_backend(_config(name="google", fallback="google"))
     assert isinstance(backend, GoogleBackend)
+
+
+# -- _has_credentials ---------------------------------------------------
+
+def test_has_credentials_google_is_always_true(monkeypatch):
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    assert _has_credentials("google") is True
+
+
+def test_has_credentials_gemini_checks_either_env_var(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    assert _has_credentials("gemini") is False
+    monkeypatch.setenv("GOOGLE_API_KEY", "x")
+    assert _has_credentials("gemini") is True
+
+
+def test_has_credentials_anthropic_checks_its_env_var(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert _has_credentials("anthropic") is False
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
+    assert _has_credentials("anthropic") is True
+
+
+# -- make_backend: fallback requires usable credentials ----------------------
+#
+# A credential-less fallback is worse than none: FallbackBackend retries
+# via it on every non-ok primary result, including the primary's own
+# legitimate per-unit failures, and a credential-less SDK client can
+# raise in a way that crashes the whole document instead of leaving one
+# unit honestly untranslated (see registry.make_backend's docstring).
+
+def test_make_backend_skips_fallback_when_credentials_missing(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    backend = make_backend(_config(name="google", fallback="anthropic"))
+    assert isinstance(backend, GoogleBackend)  # no FallbackBackend wrapper at all
+
+
+def test_make_backend_wires_fallback_when_credentials_present(monkeypatch):
+    pytest.importorskip("anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+    backend = make_backend(_config(name="google", fallback="anthropic"))
+    assert isinstance(backend, FallbackBackend)
+    assert backend.fallback.name == "anthropic"
 
 
 def test_make_backend_wires_gemini_config_fields(monkeypatch):

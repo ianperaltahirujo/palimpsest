@@ -19,6 +19,7 @@ raw text and decides internally, per sub-backend, how to protect it.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 
 from palimpsest.config.model import Config
@@ -32,6 +33,30 @@ from palimpsest.translate.google import GoogleBackend
 from palimpsest.translate.translator import Translator
 
 _KNOWN = ("google", "anthropic", "gemini")
+
+
+def _has_credentials(name: str) -> bool:
+    """Best-effort check of the env var each backend's own SDK resolves
+    a key from -- used only to decide whether it's worth wiring up as a
+    FALLBACK (see `make_backend`), never to gate using it as the primary
+    backend directly (each backend's own constructor is the source of
+    truth there, and raises its own clear error if misconfigured).
+
+    Deliberately checks only the documented env var, not every auth
+    method the underlying SDK supports (e.g. anthropic's `auth_token` or
+    an `ant auth login` profile) -- getting this wrong in the "available"
+    direction would just mean the fallback attempt fails as before this
+    check existed; getting it wrong in the "unavailable" direction only
+    means a working alternate-auth fallback doesn't get used, which is
+    the same experience as not configuring a fallback at all. Neither
+    failure mode crashes anything, unlike skipping this check entirely."""
+    if name == "google":
+        return True  # deep_translator's free scrape, no key at all
+    if name == "gemini":
+        return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    if name == "anthropic":
+        return bool(os.environ.get("ANTHROPIC_API_KEY"))
+    return False
 
 
 def _build_one(name: str, config: Config) -> Backend:
@@ -51,10 +76,23 @@ def _build_one(name: str, config: Config) -> Backend:
 
 def make_backend(config: Config) -> Backend:
     """The backend named by `[backend].name`, wrapped with the one named
-    by `[backend].fallback` if configured and different."""
+    by `[backend].fallback` if configured, different, and actually usable.
+
+    A fallback with no credentials is worse than no fallback at all: the
+    primary backend's OWN per-unit failures (e.g. a legitimate entity/
+    number verification mismatch -- an expected, honest outcome, not a
+    bug) would otherwise trigger a fallback attempt on every single one,
+    and a credential-less SDK client raises on the first real call in a
+    way this project's exception handling can't always turn into a clean
+    per-unit failure (see `translate.anthropic`'s lazy credential
+    resolution) -- crashing the whole job instead of leaving that one
+    unit honestly untranslated and continuing, exactly what would have
+    happened with no fallback configured."""
     primary = _build_one(config.backend.name, config)
     fallback_name = config.backend.fallback
     if not fallback_name or fallback_name == config.backend.name:
+        return primary
+    if not _has_credentials(fallback_name):
         return primary
     fallback = _build_one(fallback_name, config)
     return FallbackBackend(primary, fallback)
