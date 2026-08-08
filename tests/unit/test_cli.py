@@ -8,6 +8,7 @@ test_registry.py.
 from __future__ import annotations
 
 import json
+import os
 
 import fitz
 import pytest
@@ -381,3 +382,21 @@ def test_config_validate_reports_error(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "load_context", _raise)
     rc = cli.main(["config", "validate"])
     assert rc == 3
+
+
+# -- .env loading -----------------------------------------------------------
+
+def test_main_loads_dotenv_into_unset_var(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PALIMPSEST_TEST_DOTENV_VAR", raising=False)
+    (tmp_path / ".env").write_text("PALIMPSEST_TEST_DOTENV_VAR=from-dotenv\n", encoding="utf-8")
+    cli.main(["config", "init"])
+    assert os.environ["PALIMPSEST_TEST_DOTENV_VAR"] == "from-dotenv"
+
+
+def test_main_dotenv_never_overrides_real_env(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PALIMPSEST_TEST_DOTENV_VAR", "from-shell")
+    (tmp_path / ".env").write_text("PALIMPSEST_TEST_DOTENV_VAR=from-dotenv\n", encoding="utf-8")
+    cli.main(["config", "init"])
+    assert os.environ["PALIMPSEST_TEST_DOTENV_VAR"] == "from-shell"

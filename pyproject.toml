@@ -27,6 +27,7 @@ dependencies = [
   "lxml>=5.0",
   "numpy>=1.26",
   "pillow>=10.0",
+  "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
