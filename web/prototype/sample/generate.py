@@ -1,7 +1,7 @@
-"""Generates the wipe-demo sample pair -- source.png (Spanish), output.png
-(English), and layout.json/layout.js (the English page's real IR, for edit
-mode) -- a miniature stand-in for what translate_pdf_document() actually
-produces. Content is entirely fictional (the de-identified cast from
+"""Generates the wipe-demo sample pair -- public/sample/{source,output}.png
+and src/sample/layout.json (the English page's real IR, for edit mode) --
+a miniature stand-in for what translate_pdf_document() actually produces.
+Content is entirely fictional (the de-identified cast from
 docs/design/protected-entities.md: Grupo Meridian, Banco Litoral, Andrés
 Carreño) -- never run against real corpus documents, and this script must
 never grow a way to point at one (no --from path, no reading argv) --
@@ -10,18 +10,19 @@ prototype at runtime; run once to regenerate the checked-in files.
 
     python generate.py
 
-layout.json/layout.js are NOT hand-built. build() constructs the page,
-then the REAL extractor (palimpsest.pdf.layout.extract_paragraphs +
-page_to_ir) runs over it, so the fixture is definitionally the same shape
-production emits -- alignment, leading, and paragraph boundaries all came
-out of the actual functions, not a guess at their shape. If a boundary
-looks wrong for the demo, fix it by adjusting the synthetic page geometry
-below and re-running; never hand-edit the generated JSON.
+layout.json is NOT hand-built. build() constructs the page, then the REAL
+extractor (palimpsest.pdf.layout.extract_paragraphs + page_to_ir) runs
+over it, so the fixture is definitionally the same shape production
+emits -- alignment, leading, and paragraph boundaries all came out of the
+actual functions, not a guess at their shape. If a boundary looks wrong
+for the demo, fix it by adjusting the synthetic page geometry below and
+re-running; never hand-edit the generated JSON.
 """
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import fitz
 
@@ -165,7 +166,9 @@ def build(lang: str) -> fitz.Document:
     return doc
 
 
-def build_layout_envelope(en_doc: fitz.Document, png_name: str, px_width: int, px_height: int) -> dict:
+def build_layout_envelope(
+    en_doc: fitz.Document, png_name: str, px_width: int, px_height: int
+) -> dict:
     """Runs the real extractor over the already-built English page and
     wraps its IR in the envelope the prototype (and later, the real
     /api/jobs/{id}/layout endpoint) expects.
@@ -201,13 +204,20 @@ def build_layout_envelope(en_doc: fitz.Document, png_name: str, px_width: int, p
     }
 
 
+PUBLIC_SAMPLE = Path(__file__).resolve().parent.parent / "public" / "sample"
+SRC_SAMPLE = Path(__file__).resolve().parent.parent / "src" / "sample"
+
+
 def main():
+    PUBLIC_SAMPLE.mkdir(parents=True, exist_ok=True)
+    SRC_SAMPLE.mkdir(parents=True, exist_ok=True)
+
     pixmaps: dict[str, fitz.Pixmap] = {}
     docs: dict[str, fitz.Document] = {}
     for lang, out in (("es", "source.png"), ("en", "output.png")):
         doc = build(lang)
         pix = doc[0].get_pixmap(matrix=fitz.Matrix(RENDER_ZOOM, RENDER_ZOOM))
-        pix.save(out)
+        pix.save(str(PUBLIC_SAMPLE / out))
         print(f"{out}: {pix.width}x{pix.height}")
         pixmaps[lang] = pix
         docs[lang] = doc
@@ -216,15 +226,15 @@ def main():
     envelope = build_layout_envelope(docs["en"], "output.png", en_pix.width, en_pix.height)
     layout_json = json.dumps(envelope, indent=2, ensure_ascii=False)
 
-    with open("layout.json", "w", encoding="utf-8") as f:
-        f.write(layout_json)
-    # A second, byte-identical copy as a JS assignment: fetch("layout.json")
-    # is blocked under file://, and the prototype must open by double-click
-    # with no server. Both are written from the same `layout_json` string
-    # in this one call, so the two can never drift short of a hand edit.
-    with open("layout.js", "w", encoding="utf-8") as f:
-        f.write(f"window.PP_LAYOUT = {layout_json};\n")
-    print(f"layout.json / layout.js: {len(envelope['pages'][0]['paragraphs'])} paragraphs")
+    # Raster assets are static files the browser fetches by URL, so they
+    # live in public/ (Vite serves it verbatim, unprocessed). layout.json
+    # is imported as a JS module (`import layout from "../sample/layout.json"`
+    # in CompareStage.jsx) -- Vite's module graph does not cover public/,
+    # so this one file lives under src/ instead. No more layout.js: that
+    # existed only because fetch() was blocked under file://, which Vite's
+    # dev server and build output don't have.
+    (SRC_SAMPLE / "layout.json").write_text(layout_json, encoding="utf-8")
+    print(f"layout.json: {len(envelope['pages'][0]['paragraphs'])} paragraphs")
 
     for doc in docs.values():
         doc.close()

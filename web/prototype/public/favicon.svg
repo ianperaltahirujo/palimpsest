@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Static copy of the "two pages in register" mark from src/components/Logo.jsx,
+       indigo-ink-over-oxblood palette hardcoded since a favicon can't read the
+       app's CSS custom properties. Keep in sync if that palette changes. -->
+  <rect x="3" y="4" width="14.5" height="17.5" rx="1.1" fill="none" stroke="#7A2E2E" stroke-width="1.5" />
+  <rect x="6.5" y="2.5" width="14.5" height="17.5" rx="1.1" fill="none" stroke="#2E3B63" stroke-width="1.5" />
+</svg>

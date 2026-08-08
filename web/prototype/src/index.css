@@ -1,0 +1,625 @@
+/* ============================================================
+   Bespoke geometry tokens -- the pieces Mantine has no component
+   for (page-stack shrink-wrap, wipe clip-path, edit-mode overlay,
+   the animated registration mark). Everything else on the page is
+   a Mantine component reading Mantine's own theme (see theme.js).
+
+   Palette here mirrors the Registration system's raw hex values one
+   level below Mantine's color scales, because these rules need exact
+   exact wash/ink pairs (e.g. --pp-under-wash) that don't map cleanly
+   onto a 10-shade Mantine ramp. Driven off Mantine's own
+   [data-mantine-color-scheme] attribute so light/dark stays in sync
+   with MantineProvider with zero extra state.
+   ============================================================ */
+:root {
+  --pp-ink: #14181d;
+  --pp-ink-soft: #4b525c;
+  --pp-ink-faint: #8b929c;
+  --pp-leaf: #f6f5f2;
+  --pp-leaf-raised: #fdfcfa;
+  --pp-leaf-sunk: #ecEAe5;
+  --pp-rule: #c3c9d0;
+  --pp-rule-soft: #dbdfe3;
+  --pp-register: #0b5fd0;
+  --pp-register-ink: #08429a;
+  --pp-register-wash: #e7effc;
+  --pp-under: #c81e78;
+  --pp-under-ink: #9e1660;
+  --pp-under-wash: #fbe6f1;
+  --pp-flag: #c2410c;
+  --pp-flag-wash: #fbeae0;
+  --pp-ok: #147154;
+  --pp-ok-wash: #e4f3ec;
+  --pp-shadow-card: 0 1px 0 var(--pp-rule), 0 8px 24px -16px rgba(20, 24, 29, 0.35);
+}
+
+html[data-mantine-color-scheme="dark"] {
+  --pp-ink: #ece9e2;
+  --pp-ink-soft: #b7bcc3;
+  --pp-ink-faint: #767d87;
+  --pp-leaf: #14161a;
+  --pp-leaf-raised: #1b1e23;
+  --pp-leaf-sunk: #0f1114;
+  --pp-rule: #33383f;
+  --pp-rule-soft: #262b31;
+  --pp-register: #4c8fff;
+  --pp-register-ink: #8fbaff;
+  --pp-register-wash: #12203b;
+  --pp-under: #ff62ac;
+  --pp-under-ink: #ff9bc8;
+  --pp-under-wash: #3a1428;
+  --pp-flag: #ff8a5c;
+  --pp-flag-wash: #3a2013;
+  --pp-ok: #55cc9c;
+  --pp-ok-wash: #10281f;
+  --pp-shadow-card: 0 1px 0 var(--pp-rule), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================================
+   Registration mark (logo) -- two colour layers converging on
+   hover. .pp-m (lower/original lines) and .pp-u (upper/translated
+   lines) read from --pp-logo-lower/--pp-logo-upper, set inline per
+   palette by Logo.jsx, falling back to the Registration system's
+   own under/register hues if a caller doesn't set them.
+   ============================================================ */
+.pp-regmark .pp-m,
+.pp-regmark .pp-u {
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pp-regmark .pp-m {
+  stroke: var(--pp-logo-lower, var(--pp-under));
+  mix-blend-mode: multiply;
+  transform: translate(-0.5px, 0.5px);
+}
+.pp-regmark .pp-u {
+  stroke: var(--pp-logo-upper, var(--pp-register));
+  mix-blend-mode: multiply;
+  transform: translate(0.5px, -0.5px);
+}
+html[data-mantine-color-scheme="dark"] .pp-regmark .pp-m,
+html[data-mantine-color-scheme="dark"] .pp-regmark .pp-u {
+  mix-blend-mode: screen;
+}
+.pp-brand:hover .pp-regmark .pp-m,
+.pp-brand:hover .pp-regmark .pp-u {
+  transform: translate(0, 0);
+}
+
+/* ============================================================
+   Theme toggle -- sun/moon morph. A fixed ray group plus a mask
+   circle that carves a crescent out of the core circle; animating
+   the mask circle's cx/cy is one continuous morph, not a swap.
+   ============================================================ */
+.pp-theme-rays {
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: 8px 8px;
+}
+.pp-theme-moon-cut {
+  transition: cx 0.35s cubic-bezier(0.16, 1, 0.3, 1), cy 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pp-theme-icon[data-icon="dark"] .pp-theme-rays {
+  opacity: 0;
+  transform: scale(0.4) rotate(-40deg);
+}
+.pp-theme-icon[data-icon="dark"] .pp-theme-moon-cut {
+  cx: 10.4px;
+  cy: 4.6px;
+}
+
+/* ============================================================
+   Page stack -- `.pp-page-stack` shrink-wraps EXACTLY around
+   `.pp-page-base` (a normal-flow replaced element honours
+   max-width+max-height together correctly). That exactness is
+   what lets the edit-mode overlay register at inset:0 against
+   real page coordinates with zero JS -- see EditLayer.jsx.
+   ============================================================ */
+/* Centres the stack and gives zoomed-in content somewhere to scroll --
+   `margin:auto` alone does not centre an inline-block, which is what left
+   the page hard against the rail before this wrapper existed. */
+.pp-page-viewport {
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+}
+.pp-page-stack {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--pp-rule);
+  background: var(--pp-leaf-sunk);
+  box-shadow: var(--pp-shadow-card);
+  cursor: ew-resize;
+  touch-action: none;
+  --pp-page-vh: 64vh;
+}
+.pp-page-stack--sample {
+  --pp-page-vh: 78vh;
+}
+/* Zoom is driven off HEIGHT, not width/transform -- .pp-page-base keeps
+   its intrinsic aspect ratio at every --pp-zoom value, so .pp-page-stack
+   keeps shrink-wrapping it exactly (see the block comment above) and the
+   percentage-based edit-mode overlay stays registered with zero extra
+   math at any zoom level. */
+.pp-page-base {
+  display: block;
+  height: calc(var(--pp-zoom, 1) * var(--pp-page-vh));
+  width: auto;
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.pp-page-wipe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+  clip-path: inset(0 0 0 var(--pp-wipe-pct, 50%));
+}
+.pp-edit-layer {
+  position: absolute;
+  inset: 0;
+}
+.pp-wipe-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pp-wipe-pct, 50%);
+  z-index: 3;
+  width: 0;
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+.pp-wipe-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--pp-ink);
+  box-shadow: 0 0 0 1px var(--pp-leaf);
+}
+.pp-wipe-handle {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--pp-ink);
+  color: var(--pp-leaf);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.pp-wipe-label {
+  position: absolute;
+  top: 14px;
+  z-index: 4;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #fff;
+  pointer-events: none;
+}
+.pp-wipe-label--src {
+  left: 14px;
+  background: var(--pp-under);
+}
+.pp-wipe-label--out {
+  right: 14px;
+  background: var(--pp-register);
+}
+.pp-wipe-note {
+  text-align: center;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 11.5px;
+  color: var(--pp-ink-faint);
+  margin-top: 14px;
+}
+
+/* ============================================================
+   Edit mode -- paragraph boxes. One box per paragraph, positioned
+   by percentage against .pp-page-stack (see the comment above),
+   so resize/zoom/DPR need no JS recompute for geometry. Typography
+   alone needs a JS-computed px-per-point scale (--pp-scale, set by
+   a ResizeObserver in EditLayer.jsx) because font-size can't be
+   expressed as a % of width.
+   ============================================================ */
+.pp-pbox {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  /* Masks the previously-drawn text underneath with actual paper
+     colour -- NOT a theme token: a PDF page is white regardless of
+     the app's own theme, so this must never react to dark mode the
+     way the rest of the UI does (it did, once; the boxes rendered
+     as solid black tiles). */
+  background: #fdfdfc;
+  overflow: visible;
+  cursor: default;
+}
+.pp-pbox:hover {
+  border-color: var(--pp-rule);
+}
+.pp-pbox:focus {
+  outline: none;
+  border-color: var(--pp-register);
+  box-shadow: 0 0 0 1px var(--pp-register);
+}
+.pp-pbox.selected {
+  border-color: var(--pp-register);
+  box-shadow: 0 0 0 1px var(--pp-register);
+}
+.pp-pbox.editing {
+  border-color: var(--pp-register-ink);
+  box-shadow: 0 0 0 2px var(--pp-register-wash);
+  cursor: text;
+}
+.pp-pbox.deleted {
+  background: transparent;
+  border: 1px dashed var(--pp-flag);
+}
+.pp-pbox.deleted .pp-pbox-text {
+  visibility: hidden;
+}
+.pp-pbox-text {
+  width: 100%;
+  height: 100%;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: Georgia, "Times New Roman", serif;
+  color: #14181d; /* fixed ink, not theme-reactive -- see .pp-pbox */
+  cursor: text;
+}
+/* Headings/lists/blockquote/code are enabled in the toolbar (pass-4
+   decision -- see EditSurface.jsx) even though the renderer can't draw
+   any of them; docToRuns() still exports their TEXT. Left at Mantine/UA
+   default sizing, an <h1> here would render at ~2x the box's own font
+   size and blow the paragraph out of its geometry. Forcing every
+   descendant to the box's own inherited size keeps the toggle usable
+   -- the heading is still visually distinct via weight/family (see
+   theme.js `headings`) -- without wrecking the layout it's toggled in. */
+.pp-pbox-text h1,
+.pp-pbox-text h2,
+.pp-pbox-text h3,
+.pp-pbox-text h4,
+.pp-pbox-text blockquote,
+.pp-pbox-text pre,
+.pp-pbox-text code,
+.pp-pbox-text li {
+  font-size: inherit;
+  line-height: inherit;
+}
+.pp-pbox-text ul,
+.pp-pbox-text ol {
+  margin: 0;
+  padding-left: 1.3em;
+}
+.pp-pbox-text blockquote {
+  margin: 0;
+  padding-left: 0.7em;
+  border-left: 2px solid currentColor;
+}
+.pp-pbox-text hr {
+  margin: 0.3em 0;
+}
+.pp-pbox-restore {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 10px;
+  color: var(--pp-flag);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.pp-run.flash {
+  animation: pp-runflash 0.3s ease;
+}
+@keyframes pp-runflash {
+  0%,
+  100% {
+    background: transparent;
+  }
+  40% {
+    background: var(--pp-register-wash);
+  }
+}
+.pp-pbox-grow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  border-top: 1px dashed var(--pp-rule);
+  pointer-events: none;
+}
+.pp-pbox-cap {
+  position: absolute;
+  left: 2px;
+  top: 100%;
+  margin-top: 2px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 9px;
+  white-space: nowrap;
+  padding: 1px 5px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 2;
+}
+.pp-pbox-cap.fits {
+  background: var(--pp-ok-wash);
+  color: var(--pp-ok);
+}
+.pp-pbox-cap.shrunk {
+  background: var(--pp-flag-wash);
+  color: var(--pp-flag);
+}
+.pp-pbox-cap.overflow {
+  background: var(--pp-flag);
+  color: #fff;
+}
+.pp-pbox:not(:hover):not(.selected):not(.editing) .pp-pbox-cap {
+  opacity: 0;
+}
+.pp-pbox-grip {
+  position: absolute;
+  right: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: none;
+  border: none;
+  cursor: ew-resize;
+  padding: 0;
+  opacity: 0;
+}
+.pp-pbox.selected .pp-pbox-grip,
+.pp-pbox:hover .pp-pbox-grip {
+  opacity: 1;
+}
+.pp-pbox-grip::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  width: 2px;
+  height: 16px;
+  background: var(--pp-register);
+  transform: translateY(-50%);
+  border-radius: 1px;
+}
+
+/* ============================================================
+   Backend selector -- vendor colour containment (Part B).
+   The Registration system uses register/under SEMANTICALLY
+   (translated layer vs. original) elsewhere in the app; vendor
+   hues appear ONLY here -- the checked Radio.Indicator fill and
+   the active row's left bar -- and nowhere else in the page.
+   ============================================================ */
+/* Half the height of the title row (indicator + vendor name), centred on
+   THAT row -- not the card as a whole. The sub-line sits below, so the
+   title row's own centre sits above the card's vertical centre; a bar
+   centred on the full card would read visibly low against the name. 18px
+   approximates the title row's line box at the card's 8px top padding. */
+.pp-backend-bar {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  height: 18px;
+  width: 3px;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.pp-backend-bar.active {
+  opacity: 1;
+}
+.pp-backend-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--pp-rule);
+  background: #fff;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pp-backend-indicator.checked {
+  border-color: transparent;
+}
+.pp-backend-indicator.checked::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+/* ============================================================
+   Dev-only prototype state switcher
+   ============================================================ */
+.pp-dev-switcher {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  font-family: var(--mantine-font-family-monospace);
+}
+.pp-dev-btn {
+  padding: 6px 9px;
+  font-size: 10.5px;
+  border: 1px solid var(--pp-rule);
+  border-radius: 3px;
+  background: var(--pp-leaf);
+  color: var(--pp-ink-soft);
+  cursor: pointer;
+}
+.pp-dev-btn[data-on="true"] {
+  background: var(--pp-ink);
+  color: var(--pp-leaf);
+  border-color: var(--pp-ink);
+}
+
+.pp-btn-mini {
+  padding: 6px 10px;
+  border: 1px solid var(--pp-rule);
+  border-radius: 3px;
+  background: var(--pp-leaf-raised);
+  font-size: 11.5px;
+  font-family: var(--mantine-font-family-monospace);
+  white-space: nowrap;
+  color: var(--pp-ink);
+  cursor: pointer;
+}
+.pp-btn-mini:hover {
+  background: var(--pp-leaf-sunk);
+}
+.pp-btn-mini:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pp-rule);
+  background: var(--pp-leaf);
+  border-radius: 999px;
+  padding: 4px 6px 4px 10px;
+  font-size: 12px;
+  font-family: var(--mantine-font-family-monospace);
+  cursor: grab;
+}
+.pp-chip:active {
+  cursor: grabbing;
+}
+.pp-chip button {
+  background: none;
+  border: none;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--pp-ink-faint);
+  cursor: pointer;
+  /* The "x" glyph sits inside an inherited line-height (~1.5), so its
+     line box is taller than the 16px circle and place-items centers
+     that line box, not the glyph's own ink -- the glyph reads as
+     riding low. line-height:1 collapses the line box to the glyph's
+     natural height so grid centering lands on the glyph itself. */
+  line-height: 1;
+  font-size: 13px;
+}
+.pp-chip button:hover {
+  background: var(--pp-flag-wash);
+  color: var(--pp-flag);
+}
+.pp-chip--suggested {
+  border-style: dashed;
+  color: var(--pp-ink-soft);
+  background: transparent;
+  cursor: pointer;
+}
+
+.pp-drop-zone {
+  border-radius: 5px;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pp-drop-zone.empty {
+  min-height: 30px;
+  align-items: center;
+  border: 1px dashed var(--pp-rule);
+}
+.pp-drop-zone.over {
+  background: var(--pp-register-wash);
+  box-shadow: inset 0 0 0 1px var(--pp-register);
+}
+
+.pp-state-pad {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 36px 40px 80px;
+}
+.pp-stage-h1 {
+  font-family: "Archivo Expanded", "Arial Narrow", sans-serif;
+  font-weight: 800;
+  font-stretch: 112%;
+  font-size: 28px;
+  letter-spacing: 0.005em;
+  margin: 0;
+}
+@media (max-width: 900px) {
+  .pp-state-pad {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+.pp-download-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border: 1px solid var(--pp-rule);
+  border-radius: 3px;
+  background: var(--pp-leaf-raised);
+  min-width: 200px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+.pp-download-card:hover {
+  border-color: var(--pp-ink);
+}
+.pp-dl-icon {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--pp-rule);
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 9px;
+  flex: 0 0 auto;
+}
+
+.pp-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--pp-register);
+  font-family: var(--mantine-font-family-monospace);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

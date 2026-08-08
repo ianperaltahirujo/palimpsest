@@ -1,0 +1,64 @@
+import { Button, Text } from "@mantine/core";
+import { Dropzone } from "@mantine/dropzone";
+import { notifications } from "@mantine/notifications";
+import PageWipe from "./PageWipe.jsx";
+import { useAppState } from "../state.jsx";
+import { useT } from "../i18n.jsx";
+import { MOCK } from "../config.js";
+
+export default function Sample() {
+  const { goto, addUploads } = useAppState();
+  const t = useT();
+
+  async function handleFiles(files) {
+    if (MOCK || files.length === 0) {
+      goto("queue");
+      return;
+    }
+    try {
+      await addUploads(files);
+      goto("queue");
+    } catch (e) {
+      notifications.show({ message: e.message, color: "flag" });
+    }
+  }
+
+  return (
+    <div style={{ padding: "32px 40px 20px", maxWidth: 1200, margin: "0 auto" }}>
+      {/* Dropping directly on the hero page counts too, not just the slim
+          dropzone bar beneath it -- matches the copy below. */}
+      <div
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          handleFiles(Array.from(e.dataTransfer.files || []));
+        }}
+      >
+        <PageWipe
+          baseSrc="/sample/output.png"
+          baseAlt={t("sample.altOut")}
+          wipeSrc="/sample/source.png"
+          wipeAlt={t("sample.altSrc")}
+          sample
+        />
+      </div>
+      <Text ta="center" ff="monospace" size="xs" c="dimmed" mt={14}>
+        {t("sample.caption")}
+      </Text>
+
+      <Dropzone onDrop={handleFiles} mt={26} accept={[".pdf", ".docx", ".pptx", ".xlsx"]}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <Text fw={700} size="sm">
+              {t("sample.dropTitle")}
+            </Text>
+            <Text size="xs" c="dimmed" mt={3}>
+              {t("sample.dropSub")}
+            </Text>
+          </div>
+          <Button>{t("common.chooseFiles")}</Button>
+        </div>
+      </Dropzone>
+    </div>
+  );
+}
