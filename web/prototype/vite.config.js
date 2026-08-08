@@ -4,6 +4,17 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   base: "./",
   plugins: [react()],
+  server: {
+    proxy: {
+      // changeOrigin: false (the default) keeps the forwarded Host header
+      // as localhost:5173 -- server/security.py's OriginCheckMiddleware
+      // derives the expected origin from the request's OWN Host header,
+      // so this makes the dev server same-origin from the middleware's
+      // point of view with no --dev-origin allowlist entry needed. Setting
+      // changeOrigin: true here would make every mutating request 403.
+      "/api": { target: "http://127.0.0.1:8000" },
+    },
+  },
   build: {
     rollupOptions: {
       output: {
