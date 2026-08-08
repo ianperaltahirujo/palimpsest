@@ -19,6 +19,7 @@ from palimpsest.config.model import EntityGroups
 from palimpsest.core import ir
 from palimpsest.core import paths as core_paths
 from palimpsest.pdf import layout as pdf_layout
+from palimpsest.pdf import reflow
 from palimpsest.qa.compare import render_page
 from palimpsest.server.jobs import Job
 from palimpsest.server.schemas import (
@@ -365,6 +366,8 @@ def get_layout(
     state = _state(request)
     job = _get_job_or_404(state, job_id)
     jf = _job_file_or_404(job, file)
+    if jf.kind == "office":
+        raise HTTPException(status_code=400, detail="edit mode is not available for Office files")
     if jf.output_path is None or not jf.output_path.is_file():
         raise HTTPException(status_code=404, detail="translated output not available yet")
     return _layout_envelope(jf.output_path, jf.name, page)
@@ -374,16 +377,39 @@ def get_layout(
 def patch_layout(
     request: Request, job_id: str, body: dict, file: str | None = Query(None)
 ) -> JSONResponse:
-    """Persists edit-mode edits as JSON. There is no IR->PDF reflow path
-    in this library yet (see the plan's explicit non-goals), so this
-    does NOT re-render the PDF -- it stores exactly what the client
-    sent and echoes it back, honestly, rather than pretending to apply
-    it to the document."""
+    """Persists edit-mode edits as JSON (an audit trail / recovery copy,
+    kept regardless of reflow success) and regenerates the affected page
+    of the translated PDF from them via `pdf.reflow.apply_page_edits`.
+
+    The page to reflow comes from the payload itself
+    (`document.pages[0].number`, matching `useEditBoxes.exportPayload`'s
+    shape) rather than a query parameter, so the existing frontend call
+    needs no changes to get real reflow."""
     state = _state(request)
     job = _get_job_or_404(state, job_id)
     jf = _job_file_or_404(job, file)
+    if jf.kind == "office":
+        raise HTTPException(status_code=400, detail="edit mode is not available for Office files")
     out_dir = state.jobs.jobs_dir / job.id
     out_dir.mkdir(parents=True, exist_ok=True)
     edits_path = out_dir / f"{jf.file_id}.edits.json"
     edits_path.write_text(json.dumps(body, indent=2), encoding="utf-8")
-    return JSONResponse(body)
+
+    try:
+        pages = body["document"]["pages"]
+        page_body = pages[0]
+        page_no = int(page_body.get("number", 0))
+        paragraphs = page_body["paragraphs"]
+    except (KeyError, IndexError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=f"malformed layout payload: {e}") from e
+
+    if jf.output_path is None or not jf.output_path.is_file():
+        raise HTTPException(status_code=404, detail="translated output not available yet")
+
+    render_ctx = reflow.build_render_context(state.config, jf.name)
+    try:
+        result = reflow.apply_page_edits(jf.output_path, page_no, paragraphs, render_ctx)
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"could not save reflowed page: {e}") from e
+
+    return JSONResponse({**body, "reflow": result})

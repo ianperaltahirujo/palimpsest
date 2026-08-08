@@ -238,9 +238,8 @@ export default function EditSurface({ layout, active, imgSrc, onExport }) {
     a.click();
     if (onExport) {
       // Real mode: PATCH /api/jobs/{id}/layout persists the payload
-      // server-side (see routes.patch_layout) -- it does NOT regenerate
-      // the PDF (no IR->PDF reflow path exists in the library yet), so
-      // the notice says "saved as a draft", not "applied".
+      // server-side AND regenerates the affected page of the translated
+      // PDF from it (see routes.patch_layout / pdf.reflow).
       onExport(payload).then(
         () => notifications.show({ message: t("edit.exportNoticeReal"), autoClose: 4200 }),
         (e) => notifications.show({ message: e.message, color: "flag" }),

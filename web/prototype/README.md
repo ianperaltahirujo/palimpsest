@@ -163,18 +163,20 @@ looks:
   touched box) on every move or delete, since capacity is
   neighbour-dependent.
 
-Underline and highlight render live in the browser here, but **the real
-renderer cannot draw either yet** — `pdf/render.py` draws through exactly
-two `page.insert_text()` calls and nothing else. Adding those two drawing
-primitives (plus `Run.underline`/`Run.highlight` on the IR) is specified
-but not built. **There is also no IR→PDF reflow path in the library** —
-`PATCH /api/jobs/{id}/layout` persists whatever the client sends as a
-draft (see `server/routes.py`'s `patch_layout`) but does not regenerate
-the PDF; the UI's own notice says so ("saved as a draft... edits don't
-regenerate the PDF yet"). Edit mode is also scoped to digital PDFs only:
-the overlay masks previously-drawn text with flat paper, which is honest
-on a digital page and would misrepresent a scan, where the background is
-a photograph.
+Underline and highlight render live in the browser here, and the real
+renderer draws both too: `pdf/render.py`'s `draw_paragraph` draws a
+highlight rect behind, and an underline stroke under, each word whose
+style carries `Run.underline`/`Run.highlight` (see `core.ir.Run`) — word
+granularity, matching `edit/runs.js`'s `wordSnap`. **Edits actually
+reach the PDF**: `PATCH /api/jobs/{id}/layout` persists the payload as a
+draft/audit copy AND regenerates the affected page via
+`pdf/reflow.py`'s `apply_page_edits` (see `server/routes.py`'s
+`patch_layout`) — clearing and redrawing every paragraph on the page
+from a fresh `extract_paragraphs` pass, not just the touched ones, so
+the endpoint composes correctly across repeated edits to the same page.
+Edit mode is also scoped to digital PDFs only: the overlay masks
+previously-drawn text with flat paper, which is honest on a digital page
+and would misrepresent a scan, where the background is a photograph.
 
 ## Contents
 

@@ -117,10 +117,15 @@ export function downloadUrl(jobId, artifact, fileId) {
   return `${API_BASE}/api/jobs/${jobId}/download/${artifact}${q}`;
 }
 
-export function pageUrl(jobId, pageNo, { side = "output", fileId, dpi } = {}) {
+export function pageUrl(jobId, pageNo, { side = "output", fileId, dpi, v } = {}) {
   const params = new URLSearchParams({ side });
   if (fileId) params.set("file", fileId);
   if (dpi) params.set("dpi", String(dpi));
+  // Cache-buster: the browser has no way to know a reflowed page's PNG
+  // changed underneath the same URL, since the server route ignores
+  // unknown params -- bump `v` (e.g. a save counter) after a successful
+  // PATCH /layout so the <img> actually re-fetches.
+  if (v !== undefined) params.set("v", String(v));
   return `${API_BASE}/api/jobs/${jobId}/pages/${pageNo}.png?${params}`;
 }
 

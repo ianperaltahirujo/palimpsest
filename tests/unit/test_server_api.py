@@ -261,10 +261,44 @@ def test_page_png_and_layout_after_job_completes(client):
     assert len(envelope["pages"]) == 1
     assert envelope["pages"][0]["paragraphs"]
 
-    patch_body = {"note": "edited"}
+    page = envelope["pages"][0]
+    para0 = page["paragraphs"][0]
+    edited = {
+        **para0, "edit": "modified",
+        "runs": [{"text": "Reflowed replacement text", "bold": False, "italic": False,
+                   "underline": True, "highlight": None, "color": para0["color"]}],
+    }
+    patch_body = {
+        "schema": 1, "job": job_id,
+        "document": {
+            "source": envelope["source"],
+            "pages": [{"number": 0, "width": page["width"], "height": page["height"],
+                       "paragraphs": [edited]}],
+        },
+    }
     patch_resp = client.patch(f"/api/jobs/{job_id}/layout", json=patch_body)
-    assert patch_resp.status_code == 200
-    assert patch_resp.json() == patch_body
+    assert patch_resp.status_code == 200, patch_resp.text
+    reflow_result = patch_resp.json()["reflow"]
+    assert reflow_result["page"] == 0
+    assert reflow_result["redrawn"] >= 1
+
+    # The edit must land in the actual PDF, not just the draft sidecar.
+    download_resp = client.get(f"/api/jobs/{job_id}/download/replica")
+    assert download_resp.status_code == 200
+    doc = fitz.open(stream=download_resp.content, filetype="pdf")
+    try:
+        assert "Reflowed replacement" in doc[0].get_text()
+    finally:
+        doc.close()
+
+
+def test_patch_layout_rejects_malformed_payload(client):
+    uploaded = _upload(client)
+    job_id = client.post("/api/jobs", json={"file_ids": [uploaded["file_id"]]}).json()["job_id"]
+    _wait_for_job(client, job_id)
+
+    resp = client.patch(f"/api/jobs/{job_id}/layout", json={"note": "not a layout envelope"})
+    assert resp.status_code == 400
 
 
 # -- origin check middleware ---------------------------------------------

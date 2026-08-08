@@ -26,6 +26,10 @@ export default function CompareStage() {
   const [mode, setMode] = useState("edit");
   const [layout, setLayout] = useState(MOCK ? mockLayout : null);
   const [layoutError, setLayoutError] = useState(null);
+  // Bumped after every successful PATCH /layout so the page PNG's URL
+  // changes and the browser re-fetches instead of serving the
+  // pre-reflow image it already cached under the same URL.
+  const [reflowVersion, setReflowVersion] = useState(0);
 
   const file = job?.files?.[0];
   const fileId = file?.file_id;
@@ -41,6 +45,7 @@ export default function CompareStage() {
 
   async function handlePatchLayout(payload) {
     await api.patchLayout(jobId, payload, { fileId });
+    setReflowVersion((v) => v + 1);
   }
 
   return (
@@ -70,7 +75,7 @@ export default function CompareStage() {
 
       {mode === "compare" ? (
         <PageWipe
-          baseSrc={MOCK ? "/sample/output.png" : api.pageUrl(jobId, pageIndex, { side: "output", fileId })}
+          baseSrc={MOCK ? "/sample/output.png" : api.pageUrl(jobId, pageIndex, { side: "output", fileId, v: reflowVersion })}
           baseAlt={t("sample.altOut")}
           wipeSrc={MOCK ? "/sample/source.png" : api.pageUrl(jobId, pageIndex, { side: "source", fileId })}
           wipeAlt={t("sample.altSrc")}
@@ -80,7 +85,7 @@ export default function CompareStage() {
           <EditSurface
             layout={layout}
             active={mode === "edit"}
-            imgSrc={MOCK ? undefined : api.pageUrl(jobId, pageIndex, { side: "output", fileId })}
+            imgSrc={MOCK ? undefined : api.pageUrl(jobId, pageIndex, { side: "output", fileId, v: reflowVersion })}
             onExport={MOCK ? undefined : handlePatchLayout}
           />
         </Suspense>
