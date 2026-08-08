@@ -83,9 +83,9 @@ export default function CompareStage() {
 
       {effectiveMode === "compare" ? (
         <PageWipe
-          baseSrc={MOCK ? "/sample/output.png" : api.pageUrl(jobId, pageIndex, { side: "output", fileId, v: reflowVersion })}
+          baseSrc={MOCK ? `${import.meta.env.BASE_URL}sample/output.png` : api.pageUrl(jobId, pageIndex, { side: "output", fileId, v: reflowVersion })}
           baseAlt={t("sample.altOut")}
-          wipeSrc={MOCK ? "/sample/source.png" : api.pageUrl(jobId, pageIndex, { side: "source", fileId })}
+          wipeSrc={MOCK ? `${import.meta.env.BASE_URL}sample/source.png` : api.pageUrl(jobId, pageIndex, { side: "source", fileId })}
           wipeAlt={t("sample.altSrc")}
         />
       ) : layout ? (

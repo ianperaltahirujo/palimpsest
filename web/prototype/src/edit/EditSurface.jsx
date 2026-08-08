@@ -387,7 +387,7 @@ export default function EditSurface({ layout, active, imgSrc, onExport }) {
 
       <div className="pp-page-viewport">
       <div ref={stackRef} className="pp-page-stack" style={{ "--pp-scale": scale, "--pp-zoom": zoom, cursor: "default" }}>
-        <img className="pp-page-base" src={imgSrc || `/sample/${renderInfo.png}`} alt={t("sample.altOut")} draggable={false} />
+        <img className="pp-page-base" src={imgSrc || `${import.meta.env.BASE_URL}sample/${renderInfo.png}`} alt={t("sample.altOut")} draggable={false} />
         <div className="pp-edit-layer">
           {pageIr.paragraphs.map((p, i) => {
             const key = boxState.paraKey(i);

@@ -102,6 +102,28 @@ export default function Results() {
 
   if (compareOpen) return <CompareStage />;
 
+  // summarize(null) renders zeros in every stat cell ("0 of 0 paragraphs
+  // translated", "nothing to report") -- reads as a completed job with
+  // a clean bill of health rather than "no job at all", which is the
+  // actual state right after a job's own GET /api/jobs/{id} fetch fails
+  // (Running.jsx's onDone handler swallows that fetch's rejection and
+  // still navigates here). An honest empty state instead of a fake one.
+  if (!MOCK && !job) {
+    return (
+      <div className="pp-state-pad">
+        <Title order={1} style={{ fontFamily: '"Archivo Expanded", "Arial Narrow", sans-serif', fontWeight: 800, fontStretch: "112%", fontSize: 30, lineHeight: 1.2 }}>
+          {t("results.noJobTitle")}
+        </Title>
+        <Text size="sm" c="dimmed" mt={10} maw="62ch">
+          {t("results.noJobBody")}
+        </Text>
+        <Button variant="default" mt={18} onClick={handleNewTranslation}>
+          {t("results.newTranslation")}
+        </Button>
+      </div>
+    );
+  }
+
   const summary = MOCK ? null : summarize(job);
   const stats = MOCK ? RESULTS_STATS : summary.stats;
   const issues = MOCK ? RESULTS_ISSUES : summary.failedList;

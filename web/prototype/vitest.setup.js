@@ -24,3 +24,12 @@ window.matchMedia ??= (query) => ({
   removeEventListener: () => {},
   dispatchEvent: () => false,
 });
+
+// jsdom also has no ResizeObserver -- Mantine's ScrollArea (AppShell.Navbar/
+// Main use it) calls `new ResizeObserver(...)` on mount. No test here reads
+// observed sizes, so a no-op stub is enough.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};

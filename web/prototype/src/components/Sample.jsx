@@ -34,10 +34,15 @@ export default function Sample() {
           handleFiles(Array.from(e.dataTransfer.files || []));
         }}
       >
+        {/* Root-absolute paths (/sample/*.png) 404 once this build is
+            published under a subpath (e.g. GitHub Pages' /<repo>/) --
+            BASE_URL reflects vite.config.js's own `base` setting, so this
+            resolves the same way the built <script>/<link> tags already
+            do. */}
         <PageWipe
-          baseSrc="/sample/output.png"
+          baseSrc={`${import.meta.env.BASE_URL}sample/output.png`}
           baseAlt={t("sample.altOut")}
-          wipeSrc="/sample/source.png"
+          wipeSrc={`${import.meta.env.BASE_URL}sample/source.png`}
           wipeAlt={t("sample.altSrc")}
           sample
         />

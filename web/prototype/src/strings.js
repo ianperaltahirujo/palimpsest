@@ -21,6 +21,7 @@ export const STRINGS = {
     "app.brandAria": "Go to overview",
     "app.showSidebar": "Show sidebar",
     "app.backendUnreachable": "Couldn't reach the server",
+    "app.serverUnreachableBody": "No local server is answering at the address in the sidebar. Start one with `{cmd}`.",
 
     "theme.toggle": "Toggle color theme",
 
@@ -157,6 +158,8 @@ export const STRINGS = {
     "running.jobFailed": "The job failed -- see the results page for detail.",
 
     "results.titleRest": "of {total} paragraphs translated.",
+    "results.noJobTitle": "No results yet",
+    "results.noJobBody": "There's no translation to show here -- start one from the overview or sample screen.",
     "results.disclaimer": "Machine translation isn't perfect -- review this document before relying on it, especially names, dates, and figures.",
     "results.fileFailedTitle": "This translation could not be completed",
     "results.viewPages": "View pages",
@@ -221,6 +224,7 @@ export const STRINGS = {
     "app.brandAria": "Ir al resumen",
     "app.showSidebar": "Mostrar barra lateral",
     "app.backendUnreachable": "No se pudo conectar con el servidor",
+    "app.serverUnreachableBody": "Ningún servidor local responde en la dirección de la barra lateral. Inícialo con `{cmd}`.",
 
     "theme.toggle": "Cambiar tema de color",
 
@@ -357,6 +361,8 @@ export const STRINGS = {
     "running.jobFailed": "El trabajo falló -- ver la página de resultados para más detalle.",
 
     "results.titleRest": "de {total} párrafos traducidos.",
+    "results.noJobTitle": "Aún no hay resultados",
+    "results.noJobBody": "No hay ninguna traducción que mostrar aquí -- inicia una desde la pantalla de inicio o de muestra.",
     "results.disclaimer": "La traducción automática no es perfecta -- revisa este documento antes de confiar en él, especialmente nombres, fechas y cifras.",
     "results.fileFailedTitle": "Esta traducción no se pudo completar",
     "results.viewPages": "Ver páginas",
