@@ -8,26 +8,42 @@ That is only safe because of what else is true:
 
 - Binds to `127.0.0.1` unless the caller explicitly asks for something
   else (enforced in `cli.cmd_serve`, one layer up).
-- No CORS is configured in production mode: the built SPA is served
-  from this same FastAPI process, at the same origin, so the browser's
-  own same-origin policy already does the job CORS headers exist to
-  relax. `dev=True` adds exactly one extra allowed origin, Vite's own
-  dev server port, and nothing else.
+- No CORS is configured by default: the built SPA is served from this
+  same FastAPI process, at the same origin, so the browser's own
+  same-origin policy already does the job CORS headers exist to relax.
+  `extra_origins` (from `--dev-origin`/`--dev`, or one or more
+  `--allow-origin` flags -- e.g. a GitHub Pages URL hosting a
+  standalone build of this same frontend) adds exactly those origins
+  and nothing else. Every origin here must be one the caller
+  explicitly names; this must never become a wildcard, since
+  `OriginCheckMiddleware` (below) is what stands between an arbitrary
+  webpage open in another tab and this server.
 - `OriginCheckMiddleware` (see `security.py`) rejects any mutating
   cross-origin request regardless of CORS config, as a second,
   independent layer -- CORS is what a *compliant* browser enforces
-  client-side; this is enforced server-side.
+  client-side; this is enforced server-side. `PrivateNetworkAccessMiddleware`
+  (also `security.py`) answers the extra preflight check Chrome requires
+  before a public HTTPS origin (like a GitHub Pages URL) may reach a
+  loopback target like this server at all.
 - API keys are read from the process environment exactly the way the
-  CLI already does (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) and are
-  never accepted over HTTP, stored in a job record, or included in any
-  response body -- `/api/health` reports only whether each is present.
-  A `.env` file, if present, is loaded into that same environment by
-  `cli.py::main()` before `serve` even starts -- a convenience for
-  populating the environment, not a second place a key can come from.
+  CLI already does (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`), are never
+  stored in a job record, and are never included in any response body
+  -- `/api/health` reports only whether each is present. They CAN now
+  be accepted over HTTP (`PUT /api/keys`, `routes.py`), which is a
+  deliberate, narrow exception to "never over HTTP," made specifically
+  so a key can be typed into a page instead of a shell: only from a
+  request whose origin already passed `OriginCheckMiddleware` (so only
+  an origin the caller explicitly allowlisted), only applied to this
+  same loopback-bound process's own environment, and written only to
+  a local `.env` this same machine controls -- never proxied, relayed,
+  or logged. A `.env` file, if present, is also loaded into that same
+  environment by `cli.py::main()` before `serve` even starts.
 
-None of this is adequate for a hosted, multi-user deployment. It is
-adequate for what this is: a local tool one person runs against their
-own documents on their own machine.
+None of this is adequate for a hosted, multi-user deployment -- there is
+still exactly one active key per running server process, no per-request
+auth, and one shared job queue. It is adequate for what this is: a local
+tool one person runs against their own documents on their own machine,
+optionally driven from a frontend published somewhere else.
 """
 
 from __future__ import annotations
@@ -45,7 +61,7 @@ from starlette.middleware.cors import CORSMiddleware
 from palimpsest.config import loader as config_loader
 from palimpsest.config.model import Config, DocumentMap
 from palimpsest.server.jobs import JobRegistry
-from palimpsest.server.security import OriginCheckMiddleware
+from palimpsest.server.security import OriginCheckMiddleware, PrivateNetworkAccessMiddleware
 from palimpsest.server.uploads import UploadedFile
 from palimpsest.text import postfix
 from palimpsest.text.glossary import Glossary
@@ -129,28 +145,35 @@ def create_app(
     config: Config,
     *,
     static_dir: Path | None = None,
-    dev_origin: str | None = None,
+    extra_origins: frozenset[str] = frozenset(),
     backend_factory: Callable[[Config], Backend] = make_backend,
 ) -> FastAPI:
     """`static_dir`, if given, is the built SPA (`web/prototype/dist`),
     mounted at `/` so the app is served from the same origin as the API
-    -- see the module docstring for why that matters. `dev_origin`
-    (e.g. `http://localhost:5173`) is the ONE extra origin allowed when
-    running against Vite's dev server instead of a build; never set in
-    a production `palimpsest serve`. `backend_factory` exists so tests
-    can inject a `FakeBackend` -- production callers never pass it."""
+    -- see the module docstring for why that matters. `extra_origins`
+    (e.g. `{"http://localhost:5173"}` for `--dev`, or a GitHub Pages URL
+    from one or more `--allow-origin` flags) are the ONLY origins
+    allowed cross-origin; empty in a plain production `palimpsest serve`.
+    `backend_factory` exists so tests can inject a `FakeBackend` --
+    production callers never pass it."""
     from palimpsest.server.routes import router
 
     app = FastAPI(title="palimpsest", docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.state.palimpsest = _load_state(config, backend_factory)
 
-    allowed_origins = {dev_origin} if dev_origin else set()
-    app.add_middleware(OriginCheckMiddleware, allowed_origins=frozenset(allowed_origins))
-    if dev_origin:
+    app.add_middleware(OriginCheckMiddleware, allowed_origins=extra_origins)
+    if extra_origins:
+        # CORSMiddleware answers the normal preflight (ACAO/ACAM/ACAH);
+        # PrivateNetworkAccessMiddleware must be added AFTER it so it
+        # wraps CORSMiddleware (Starlette's outermost layer = last
+        # added) and can add the one extra header Chrome requires before
+        # a public HTTPS origin may reach this loopback server at all --
+        # see security.py.
         app.add_middleware(
-            CORSMiddleware, allow_origins=[dev_origin],
+            CORSMiddleware, allow_origins=list(extra_origins),
             allow_methods=["*"], allow_headers=["*"],
         )
+        app.add_middleware(PrivateNetworkAccessMiddleware)
 
     app.include_router(router)
 

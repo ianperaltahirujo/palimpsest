@@ -384,3 +384,66 @@ def test_same_origin_request_with_origin_header_is_allowed(client):
         headers={"Origin": str(client.base_url)},
     )
     assert resp.status_code == 200
+
+
+def test_allow_origin_permits_an_explicitly_allowlisted_cross_origin_request(tmp_path):
+    config = _config(tmp_path)
+    app = create_app(
+        config, backend_factory=_fake_backend_factory,
+        extra_origins=frozenset({"https://example.github.io"}),
+    )
+    with TestClient(app) as c:
+        resp = c.put(
+            "/api/entities",
+            json={"companies": [], "people": [], "places": [], "other": []},
+            headers={"Origin": "https://example.github.io"},
+        )
+    assert resp.status_code == 200
+
+
+def test_allow_origin_still_rejects_any_other_cross_origin_request(tmp_path):
+    config = _config(tmp_path)
+    app = create_app(
+        config, backend_factory=_fake_backend_factory,
+        extra_origins=frozenset({"https://example.github.io"}),
+    )
+    with TestClient(app) as c:
+        resp = c.put(
+            "/api/entities",
+            json={"companies": [], "people": [], "places": [], "other": []},
+            headers={"Origin": "https://evil.example"},
+        )
+    assert resp.status_code == 403
+
+
+def test_private_network_access_preflight_gets_the_extra_header_only_when_allowlisted(tmp_path):
+    config = _config(tmp_path)
+    app = create_app(
+        config, backend_factory=_fake_backend_factory,
+        extra_origins=frozenset({"https://example.github.io"}),
+    )
+    with TestClient(app) as c:
+        resp = c.options(
+            "/api/entities",
+            headers={
+                "Origin": "https://example.github.io",
+                "Access-Control-Request-Method": "PUT",
+                "Access-Control-Request-Private-Network": "true",
+            },
+        )
+    assert resp.headers.get("access-control-allow-private-network") == "true"
+
+
+def test_no_extra_origins_means_no_cors_headers_at_all(client):
+    # Plain `palimpsest serve` (no --dev, no --allow-origin) must be
+    # byte-for-byte unchanged: no CORSMiddleware, no PNA header, ever.
+    resp = client.options(
+        "/api/entities",
+        headers={
+            "Origin": "https://example.github.io",
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Private-Network": "true",
+        },
+    )
+    assert "access-control-allow-private-network" not in resp.headers
+    assert "access-control-allow-origin" not in resp.headers

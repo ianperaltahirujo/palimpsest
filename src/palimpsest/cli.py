@@ -417,8 +417,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
         packaged = Path(__file__).resolve().parent / "server" / "static"
         static_dir = Path(args.static) if args.static else packaged
 
-    dev_origin = args.dev_origin if args.dev else None
-    app = create_app(config, static_dir=static_dir, dev_origin=dev_origin)
+    extra_origins = frozenset(({args.dev_origin} if args.dev else set()) | set(args.allow_origin))
+    app = create_app(config, static_dir=static_dir, extra_origins=extra_origins)
 
     url = f"http://{args.host}:{args.port}"
     print(f"palimpsest serving at {url}")
@@ -510,6 +510,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument(
         "--dev-origin", default="http://localhost:5173",
         help="the Vite dev server's origin, allowed cross-origin only with --dev",
+    )
+    p_serve.add_argument(
+        "--allow-origin", action="append", default=[],
+        help="an additional origin (e.g. a GitHub Pages URL, exact scheme+host, no "
+        "trailing slash) allowed to make cross-origin requests -- repeatable. Only ever "
+        "use this for an origin you control; never a wildcard.",
     )
     p_serve.add_argument("--static", help="override the built SPA directory")
     p_serve.add_argument("--no-browser", action="store_true")
