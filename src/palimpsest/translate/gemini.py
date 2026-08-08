@@ -344,13 +344,24 @@ class GeminiBackend:
         system = _system_prompt(ctx)
         total_input = 0
         try:
+            # `count_tokens` rejects a `system_instruction` in its config
+            # outside Vertex/Enterprise mode ("system_instruction parameter
+            # is only supported in Gemini Enterprise Agent Platform mode,
+            # not in Gemini Developer API mode") -- the plain API-key mode
+            # this backend actually runs in. The system prompt is counted
+            # separately, as literal content, and added per call instead:
+            # `translate()`'s real `generate_content` call sends it with
+            # every request, so omitting it here would undercount, not
+            # just work around the SDK restriction.
+            system_tokens = self._client.models.count_tokens(
+                model=self.model, contents=system,
+            ).total_tokens
             for t in texts:
                 counted = self._client.models.count_tokens(
                     model=self.model,
                     contents=_SINGLE_USER_TEMPLATE.format(text=t),
-                    config=genai_types.GenerateContentConfig(system_instruction=system),
                 )
-                total_input += counted.total_tokens
+                total_input += counted.total_tokens + system_tokens
         except genai_errors.APIError as e:
             raise BackendError(f"could not estimate cost: {e}") from e
         # Output tokens are unknown until translation happens; translated

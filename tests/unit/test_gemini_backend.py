@@ -175,12 +175,30 @@ def test_translate_batch_block_marks_all_units_refused():
 # -- estimate() ---------------------------------------------------------------
 
 def test_estimate_sums_tokens_and_prices_known_model():
+    # Real `generate_content` calls send the system prompt with every
+    # request, so estimate() counts it once and adds it per text -- for
+    # 2 texts that's 3 count_tokens calls (system + 2 texts), each
+    # contributing `tokens_per_call`, so each text's total is
+    # tokens_per_call * 2 (its own + the system prompt's).
     client = FakeGeminiClient(tokens_per_call=1_000_000)
     backend = GeminiBackend(client=client, model="gemini-2.5-flash-lite")
     cost = backend.estimate(["uno", "dos"], _ctx())
     assert cost is not None
-    assert cost.input_tokens == 2_000_000
-    assert cost.usd == pytest.approx(2 * 0.10 + 2 * 0.40)
+    assert len(client.count_calls) == 3
+    assert cost.input_tokens == 4_000_000
+    assert cost.usd == pytest.approx(4 * 0.10 + 4 * 0.40)
+
+
+def test_estimate_never_passes_system_instruction_to_count_tokens():
+    """`count_tokens` rejects a `system_instruction` config outside
+    Vertex/Enterprise mode -- see the comment in gemini.py's estimate().
+    Regression test for a real SDK error this project's own FakeGeminiClient
+    doesn't validate for, only caught by exercising the real SDK."""
+    client = FakeGeminiClient(tokens_per_call=10)
+    backend = GeminiBackend(client=client, model="gemini-2.5-flash-lite")
+    backend.estimate(["uno"], _ctx())
+    for call in client.count_calls:
+        assert "config" not in call
 
 
 def test_estimate_returns_none_usd_for_unknown_model():
