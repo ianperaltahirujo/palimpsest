@@ -6,13 +6,19 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // Target matches cli.py's `palimpsest serve --port` default (8765).
+      // Run with a non-default port via `VITE_API_BASE=http://localhost:PORT
+      // npm run dev` instead (see web/prototype/README.md) -- api.js then
+      // builds absolute URLs that bypass this proxy entirely, so the two
+      // mechanisms never conflict.
+      //
       // changeOrigin: false (the default) keeps the forwarded Host header
       // as localhost:5173 -- server/security.py's OriginCheckMiddleware
       // derives the expected origin from the request's OWN Host header,
       // so this makes the dev server same-origin from the middleware's
       // point of view with no --dev-origin allowlist entry needed. Setting
       // changeOrigin: true here would make every mutating request 403.
-      "/api": { target: "http://127.0.0.1:8000" },
+      "/api": { target: "http://127.0.0.1:8765" },
     },
   },
   build: {
