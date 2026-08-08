@@ -115,6 +115,54 @@ def test_load_entities_flattens_all_groups(tmp_path):
     assert set(entities) == {"Grupo Meridian", "Andres Carreno", "Santo Domingo Este", "MICM"}
 
 
+def test_load_entity_groups_missing_file_returns_empty_groups():
+    config = loader.load(None)
+    groups = loader.load_entity_groups(config)
+    assert groups.companies == groups.people == groups.places == groups.other == ()
+
+
+def test_load_entity_groups_preserves_grouping(tmp_path):
+    entities_path = tmp_path / "entities.toml"
+    entities_path.write_text(
+        """
+        [entities]
+        companies = ["Grupo Meridian"]
+        people = ["Andres Carreno"]
+        places = ["Santo Domingo Este"]
+        other = ["MICM"]
+        """,
+        encoding="utf-8",
+    )
+    cfg = tmp_path / "palimpsest.toml"
+    cfg.write_text(f'[private]\nentities = "{entities_path.name}"\n', encoding="utf-8")
+
+    config = loader.load(cfg)
+    groups = loader.load_entity_groups(config)
+    assert groups.companies == ("Grupo Meridian",)
+    assert groups.people == ("Andres Carreno",)
+    assert groups.places == ("Santo Domingo Este",)
+    assert groups.other == ("MICM",)
+
+
+def test_save_entity_groups_round_trips(tmp_path):
+    from palimpsest.config.model import EntityGroups
+
+    groups = EntityGroups(
+        companies=("Grupo Meridian", "Banco Litoral"),
+        people=("Andres Carreno",),
+        places=(),
+        other=('Quoted "Name"',),
+    )
+    entities_path = tmp_path / "entities.toml"
+    loader.save_entity_groups(entities_path, groups)
+
+    cfg = tmp_path / "palimpsest.toml"
+    cfg.write_text(f'[private]\nentities = "{entities_path.name}"\n', encoding="utf-8")
+    config = loader.load(cfg)
+    loaded = loader.load_entity_groups(config)
+    assert loaded == groups
+
+
 def test_load_documents_missing_file_returns_empty_maps():
     config = loader.load(None)
     doc_map = loader.load_documents(config)

@@ -166,6 +166,20 @@ class DocumentMap:
 
 
 @dataclass(frozen=True)
+class EntityGroups:
+    """The private entities file's own grouping, preserved -- unlike
+    `config.loader.load_entities()`, which flattens all four groups into
+    one tuple for `EntityGuard`, this keeps them apart for anything that
+    displays or edits the roster by category (e.g. the web UI's sidebar).
+    See `config.loader.load_entity_groups`/`save_entity_groups`."""
+
+    companies: tuple[str, ...] = ()
+    people: tuple[str, ...] = ()
+    places: tuple[str, ...] = ()
+    other: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Config:
     schema: int = 1
     language: LanguageConfig = field(default_factory=LanguageConfig)

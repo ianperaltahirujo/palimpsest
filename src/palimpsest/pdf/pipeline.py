@@ -25,6 +25,7 @@ import fitz
 
 from palimpsest.config.model import Config
 from palimpsest.core import paths as core_paths
+from palimpsest.core.progress import ProgressCallback, ProgressEvent, emit
 from palimpsest.pdf import clearing, inkstyle, layout
 from palimpsest.pdf.classify import Kind, classify_pdf
 from palimpsest.pdf.fontmap import FontResolver
@@ -162,17 +163,28 @@ def process_document(
     kind: Kind | None = None,
     debug: bool = False,
     pages: set[int] | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict:
     """`pages`, if given, is a 0-indexed set restricting translation to
     those pages only -- e.g. to reproduce a layout bug cheaply on a large
     scan without paying for a full-document OCR run. Pages outside the
     set are left exactly as in the source (not translated, not touched)
-    but still present in the saved output."""
+    but still present in the saved output.
+
+    `progress`, if given, is called at the boundary of each of the six
+    phases described in this module's docstring -- `None` (the default)
+    reproduces today's behaviour exactly, with zero added overhead."""
     kind = kind or classify_pdf(str(src))
+    emit(progress, ProgressEvent(phase="classify", status="done", detail=kind))
+
     work_src = src
     if kind == "scan":
+        emit(progress, ProgressEvent(phase="ocr", status="active"))
         key = core_paths.cache_key(core_paths.norm_rel(rel))
         work_src = ensure_ocr(src, config.paths.work_dir, key, config.ocr)
+        emit(progress, ProgressEvent(phase="ocr", status="done"))
+    else:
+        emit(progress, ProgressEvent(phase="ocr", status="done", detail="skipped -- not a scan"))
 
     doc = fitz.open(str(work_src))
     scanned = kind in ("scan", "ocr")
@@ -185,6 +197,7 @@ def process_document(
     # batch-translated. On a scanned page the text layer is one block per
     # physical line and knows nothing about weight, so paragraphs are
     # re-joined and bold is measured from the page's own ink.
+    emit(progress, ProgressEvent(phase="extract", status="active"))
     min_size = (
         config.thresholds.min_text_size_scan if scanned else config.thresholds.min_text_size
     )
@@ -208,12 +221,24 @@ def process_document(
             inkstyle.annotate_bold(page, paras, ink_thresholds)
         page_paras.append(paras)
 
+    total_paras = sum(len(paras) for paras in page_paras)
+    emit(
+        progress,
+        ProgressEvent(
+            phase="extract", status="done",
+            detail=f"{total_paras} paragraphs found across {len(doc)} pages",
+        ),
+    )
+
     all_text = [
         p.text for paras in page_paras for p in paras if not guard.skip(p.text)
     ]
-    tr.warm(all_text)
+    emit(progress, ProgressEvent(phase="translate", status="active"))
+    tr.warm(all_text, on_progress=progress)
+    emit(progress, ProgressEvent(phase="translate", status="done"))
 
     # Pass 2: translate, clear, redraw.
+    emit(progress, ProgressEvent(phase="render", status="active"))
     for pno in range(len(doc)):
         if pages is not None and pno not in pages:
             continue
@@ -261,12 +286,22 @@ def process_document(
                     {"page": pno + 1, "text": para.text[:90]}
                 )
 
+    emit(
+        progress,
+        ProgressEvent(
+            phase="render", status="done",
+            detail=f"{report['translated']} paragraphs drawn",
+        ),
+    )
+
+    emit(progress, ProgressEvent(phase="save", status="active"))
     out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out), garbage=4, deflate=True)
     doc.close()
     tr.cache.save()
     if render_ctx.font_resolver.substitutions:
         report["font_substitutions"] = dict(render_ctx.font_resolver.substitutions)
+    emit(progress, ProgressEvent(phase="save", status="done"))
     return report
 
 
@@ -282,6 +317,7 @@ def translate_pdf_document(
     kind: Kind | None = None,
     debug: bool = False,
     pages: set[int] | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict:
     """Entry point: build the per-document Translator/font/render context
     and run the full pipeline. `entities`/`glossary`/`post_rules` are
@@ -301,5 +337,6 @@ def translate_pdf_document(
         justify_max_stretch=config.thresholds.justify_max_stretch,
     )
     return process_document(
-        src, out, rel, tr, guard, render_ctx, config, kind=kind, debug=debug, pages=pages
+        src, out, rel, tr, guard, render_ctx, config,
+        kind=kind, debug=debug, pages=pages, progress=progress,
     )

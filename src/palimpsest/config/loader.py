@@ -7,6 +7,7 @@ module of literals.
 
 from __future__ import annotations
 
+import json
 import tomllib
 from importlib import resources
 from pathlib import Path
@@ -18,6 +19,7 @@ from palimpsest.config.model import (
     Config,
     CopyAsIsConfig,
     DocumentMap,
+    EntityGroups,
     FontsConfig,
     GeminiBackendConfig,
     GlossaryConfig,
@@ -30,6 +32,8 @@ from palimpsest.config.model import (
     ThresholdsConfig,
 )
 from palimpsest.core.errors import ConfigError
+
+_ENTITY_GROUP_NAMES = ("companies", "people", "places", "other")
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
@@ -206,18 +210,44 @@ def load(config_path: Path | None) -> Config:
     )
 
 
-def load_entities(config: Config) -> tuple[str, ...]:
-    """Flatten the private entities file into one tuple, or return an
-    empty tuple if none is configured / the file doesn't exist yet.
+def load_entity_groups(config: Config) -> EntityGroups:
+    """The private entities file, grouped as written -- an empty
+    `EntityGroups()` if none is configured / the file doesn't exist yet.
     A missing private file is normal, not an error -- see model.py."""
     path = config.private.entities
     if path is None or not path.is_file():
-        return ()
+        return EntityGroups()
     data = _read_toml(path)
     entities = data.get("entities", {})
+    return EntityGroups(
+        **{group: tuple(entities.get(group, [])) for group in _ENTITY_GROUP_NAMES}
+    )
+
+
+def save_entity_groups(path: Path, groups: EntityGroups) -> None:
+    """Write `groups` back to `path` in the same `[entities]` / group =
+    [...] shape `load_entity_groups` reads -- also the shape the web
+    prototype's own client-side "Export .toml" already hand-writes (see
+    `web/prototype/src/components/Rail.jsx`), so a file exported from
+    the browser and one written here are interchangeable. TOML string
+    arrays are JSON-compatible for plain text, so `json.dumps` is enough
+    without a TOML-writing dependency for this one simple shape."""
+    lines = ["[entities]"]
+    for group in _ENTITY_GROUP_NAMES:
+        values = getattr(groups, group)
+        lines.append(f"{group} = [{', '.join(json.dumps(v) for v in values)}]")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def load_entities(config: Config) -> tuple[str, ...]:
+    """Flatten the private entities file into one tuple, or return an
+    empty tuple if none is configured / the file doesn't exist yet --
+    what `EntityGuard` wants, which doesn't care about grouping."""
+    groups = load_entity_groups(config)
     out: list[str] = []
-    for group in ("companies", "people", "places", "other"):
-        out.extend(entities.get(group, []))
+    for group in _ENTITY_GROUP_NAMES:
+        out.extend(getattr(groups, group))
     return tuple(out)
 
 

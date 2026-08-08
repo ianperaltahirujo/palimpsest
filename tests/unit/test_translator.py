@@ -73,6 +73,27 @@ def test_warm_translates_and_caches_normal_strings(tmp_path):
     assert translator.cache.get_ok("hola mundo") is not None
 
 
+def test_warm_on_progress_fires_once_per_chunk_with_running_count(tmp_path):
+    translator, backend = _make_translator(tmp_path)
+    texts = [f"texto numero {i}" for i in range(5)]
+    events = []
+    translator.warm(texts, batch_size=2, on_progress=events.append)
+
+    # 5 items at batch_size=2 -> chunks of 2, 2, 1 -> 3 progress events
+    assert len(events) == 3
+    assert [e.count for e in events] == [2, 4, 5]
+    assert all(e.total == 5 for e in events)
+    assert all(e.phase == "translate" and e.status == "active" for e in events)
+
+
+def test_warm_with_no_on_progress_is_unaffected(tmp_path):
+    """on_progress=None (the default) must not change behaviour at all."""
+    translator, backend = _make_translator(tmp_path)
+    done = translator.warm(["hola mundo", "otro texto"])
+    assert done == 2
+    assert translator.cache.get_ok("hola mundo") is not None
+
+
 # -- glossary / cache / entity-guard short-circuit ordering -----------------
 
 def test_glossary_hit_short_circuits_before_backend_call(tmp_path):

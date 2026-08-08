@@ -32,7 +32,7 @@ from palimpsest.text.glossary import Glossary
 from palimpsest.text.protect import EntityGuard
 from palimpsest.translate.backend import TranslationContext
 from palimpsest.translate.cache import Cache, compute_namespace
-from palimpsest.translate.estimate import estimate_corpus, format_estimate
+from palimpsest.translate.estimate import estimate_document, format_document_estimate
 from palimpsest.translate.registry import make_backend
 from palimpsest.translate.translator import Translator
 
@@ -120,6 +120,16 @@ def _parse_pages(spec: str) -> set[int]:
 # -- translate -----------------------------------------------------------------
 
 
+def _open_cache(rel: str, config: Config, backend, entities, glossary) -> Cache:
+    key = core_paths.cache_key(core_paths.norm_rel(rel))
+    cache_path = config.paths.cache_dir / f"{key}.json"
+    namespace = compute_namespace(
+        backend.name, getattr(backend, "model", None), config.language.source,
+        config.language.target, glossary_terms=glossary.terms, entities=entities,
+    )
+    return Cache(cache_path, namespace=namespace)
+
+
 def _dry_run_pdf(input_path: Path, rel: str, config: Config, backend, entities, glossary) -> None:
     kind = classify_pdf(str(input_path))
     scanned = kind in ("scan", "ocr")
@@ -136,29 +146,13 @@ def _dry_run_pdf(input_path: Path, rel: str, config: Config, backend, entities, 
                 all_texts.append(p.text)
     doc.close()
 
-    unique = list(dict.fromkeys(all_texts))
-    key = core_paths.cache_key(core_paths.norm_rel(rel))
-    cache_path = config.paths.cache_dir / f"{key}.json"
-    namespace = compute_namespace(
-        backend.name, getattr(backend, "model", None), config.language.source,
-        config.language.target, glossary_terms=glossary.terms, entities=entities,
-    )
-    cache = Cache(cache_path, namespace=namespace)
-    hits = sum(1 for t in unique if cache.get_ok(t) is not None)
-    to_price = [t for t in unique if cache.get_ok(t) is None]
-
-    print(f"[{rel}] kind={kind}")
-    print(f"  pages: {n_pages}")
-    print(f"  paragraphs: {len(all_texts)} ({len(unique)} unique)")
-    if unique:
-        print(f"  cache hits: {hits}/{len(unique)} ({100 * hits / len(unique):.0f}%)")
+    cache = _open_cache(rel, config, backend, entities, glossary)
     ctx = TranslationContext(
         source_lang=config.language.source, target_lang=config.language.target,
         entities=entities, glossary=glossary.terms,
     )
-    estimate = estimate_corpus(to_price, backend, ctx)
-    for line in format_estimate(estimate).splitlines():
-        print(f"  {line}")
+    est = estimate_document(rel, all_texts, backend, ctx, cache, kind=kind, pages=n_pages)
+    print(format_document_estimate(est))
 
 
 def _dry_run_office(
@@ -168,29 +162,14 @@ def _dry_run_office(
 
     strings = ooxml.collect_strings(str(input_path))
     names = [n for n in ooxml.sheet_names(str(input_path)) if ooxml._translatable(n)]
-    unique = list(dict.fromkeys(strings + names))
 
-    key = core_paths.cache_key(core_paths.norm_rel(rel))
-    cache_path = config.paths.cache_dir / f"{key}.json"
-    namespace = compute_namespace(
-        backend.name, getattr(backend, "model", None), config.language.source,
-        config.language.target, glossary_terms=glossary.terms, entities=entities,
-    )
-    cache = Cache(cache_path, namespace=namespace)
-    hits = sum(1 for t in unique if cache.get_ok(t) is not None)
-    to_price = [t for t in unique if cache.get_ok(t) is None]
-
-    print(f"[{rel}]")
-    print(f"  strings: {len(unique)} unique")
-    if unique:
-        print(f"  cache hits: {hits}/{len(unique)} ({100 * hits / len(unique):.0f}%)")
+    cache = _open_cache(rel, config, backend, entities, glossary)
     ctx = TranslationContext(
         source_lang=config.language.source, target_lang=config.language.target,
         entities=entities, glossary=glossary.terms,
     )
-    estimate = estimate_corpus(to_price, backend, ctx)
-    for line in format_estimate(estimate).splitlines():
-        print(f"  {line}")
+    est = estimate_document(rel, strings + names, backend, ctx, cache)
+    print(format_document_estimate(est))
 
 
 def cmd_translate(args: argparse.Namespace) -> int:

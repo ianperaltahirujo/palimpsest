@@ -1,5 +1,11 @@
 from palimpsest.translate.backend import Cost, TranslationContext
-from palimpsest.translate.estimate import estimate_corpus, format_estimate
+from palimpsest.translate.cache import Cache
+from palimpsest.translate.estimate import (
+    estimate_corpus,
+    estimate_document,
+    format_document_estimate,
+    format_estimate,
+)
 
 CTX = TranslationContext(source_lang="es", target_lang="en")
 
@@ -109,3 +115,50 @@ def test_format_estimate_notes_partial_pricing():
     result = estimate_corpus(["a", "b", "c", "d"], _PartiallyPriceableBackend(), CTX)
     text = format_estimate(result)
     assert "priced 2/4" in text
+
+
+# -- estimate_document -------------------------------------------------
+
+
+def test_estimate_document_deduplicates_and_counts_cache_hits(tmp_path):
+    cache = Cache(tmp_path / "cache.json", namespace="ns")
+    cache.put("a", "A", "ok")
+    texts = ["a", "a", "b", "c"]  # "a" repeated, and already cached
+    backend = _PricedBackend()
+
+    est = estimate_document("doc.pdf", texts, backend, CTX, cache, kind="digital", pages=3)
+
+    assert est.unit_count == 4  # includes the duplicate
+    assert est.unique_count == 3  # a, b, c
+    assert est.cache_hits == 1  # only "a"
+    assert est.kind == "digital"
+    assert est.pages == 3
+    # only the two NOT-cached unique strings (b, c) are priced
+    assert backend.calls == [["b", "c"]]
+    assert est.corpus.unit_count == 2
+
+
+def test_estimate_document_office_has_no_kind_or_pages(tmp_path):
+    cache = Cache(tmp_path / "cache.json", namespace="ns")
+    est = estimate_document("Budget.xlsx", ["x", "y"], _PricedBackend(), CTX, cache)
+    assert est.kind is None
+    assert est.pages is None
+
+
+def test_format_document_estimate_pdf_shows_pages_and_kind(tmp_path):
+    cache = Cache(tmp_path / "cache.json", namespace="ns")
+    est = estimate_document(
+        "doc.pdf", ["a", "b"], _PricedBackend(), CTX, cache, kind="scan", pages=5,
+    )
+    text = format_document_estimate(est)
+    assert "kind=scan" in text
+    assert "pages: 5" in text
+    assert "paragraphs: 2 (2 unique)" in text
+
+
+def test_format_document_estimate_office_omits_pages(tmp_path):
+    cache = Cache(tmp_path / "cache.json", namespace="ns")
+    est = estimate_document("Budget.xlsx", ["x", "y"], _PricedBackend(), CTX, cache)
+    text = format_document_estimate(est)
+    assert "pages:" not in text
+    assert "strings: 2 (2 unique)" in text

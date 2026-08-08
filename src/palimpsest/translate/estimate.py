@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from palimpsest.translate.backend import Backend, TranslationContext
+from palimpsest.translate.cache import Cache
 
 
 @dataclass(frozen=True)
@@ -83,4 +84,63 @@ def format_estimate(estimate: CorpusEstimate) -> str:
         lines.append(f"  ~${estimate.usd:,.2f} estimated")
     else:
         lines.append("  cost: unknown (backend is free, or could not price this model)")
+    return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class DocumentEstimate:
+    """The five numbers the CLI's `--dry-run` prints and the web
+    Estimate screen shows, computed once here so both stay in sync by
+    construction rather than by two independently-maintained call sites."""
+
+    rel: str
+    kind: str | None
+    """PDF classification (digital/scan/ocr), or None for an Office
+    document, which has no such classification."""
+    pages: int | None
+    """None for Office documents -- "pages" isn't a meaningful count for
+    a spreadsheet or slide deck the way it is for a PDF."""
+    unit_count: int
+    """Total paragraphs/strings found, including duplicates."""
+    unique_count: int
+    cache_hits: int
+    corpus: CorpusEstimate
+    """Priced only over the unique strings NOT already in cache -- see
+    `estimate_document`."""
+
+
+def estimate_document(
+    rel: str,
+    texts: Sequence[str],
+    backend: Backend,
+    ctx: TranslationContext,
+    cache: Cache,
+    kind: str | None = None,
+    pages: int | None = None,
+) -> DocumentEstimate:
+    """`texts` is every extracted paragraph/string for this document,
+    duplicates included -- this function does the deduplication and the
+    cache-hit split itself, so every caller (CLI, server) computes the
+    same numbers the same way."""
+    unique = list(dict.fromkeys(texts))
+    hits = sum(1 for t in unique if cache.get_ok(t) is not None)
+    to_price = [t for t in unique if cache.get_ok(t) is None]
+    corpus = estimate_corpus(to_price, backend, ctx)
+    return DocumentEstimate(
+        rel=rel, kind=kind, pages=pages,
+        unit_count=len(texts), unique_count=len(unique), cache_hits=hits,
+        corpus=corpus,
+    )
+
+
+def format_document_estimate(est: DocumentEstimate) -> str:
+    lines = [f"[{est.rel}]" + (f" kind={est.kind}" if est.kind else "")]
+    if est.pages is not None:
+        lines.append(f"  pages: {est.pages}")
+    label = "paragraphs" if est.pages is not None else "strings"
+    lines.append(f"  {label}: {est.unit_count} ({est.unique_count} unique)")
+    if est.unique_count:
+        pct = 100 * est.cache_hits / est.unique_count
+        lines.append(f"  cache hits: {est.cache_hits}/{est.unique_count} ({pct:.0f}%)")
+    lines.extend(format_estimate(est.corpus).splitlines())
     return "\n".join(lines)

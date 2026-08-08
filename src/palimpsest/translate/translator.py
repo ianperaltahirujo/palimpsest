@@ -22,6 +22,7 @@ import logging
 import re
 from collections.abc import Iterable, Sequence
 
+from palimpsest.core.progress import ProgressCallback, ProgressEvent, emit
 from palimpsest.text.glossary import Glossary
 from palimpsest.text.postfix import apply as apply_post_rules
 from palimpsest.text.protect import EntityGuard, all_tokens_restored, protect, restore
@@ -140,13 +141,27 @@ class Translator:
 
     # -- bulk -----------------------------------------------------------
 
-    def warm(self, texts: Sequence[str], batch_size: int | None = None) -> int:
+    def warm(
+        self,
+        texts: Sequence[str],
+        batch_size: int | None = None,
+        on_progress: ProgressCallback | None = None,
+    ) -> int:
         """Pre-translate a document's unique strings, batching for speed.
 
         Anything the batch call cannot handle falls through to
         `translate()`, which retries and records an honest status --
         never duplicated here, so there is exactly one place that decides
         what counts as a good result.
+
+        `on_progress`, if given, fires once per completed chunk with
+        `count`/`total` against `todo` -- the strings this call actually
+        sends to the backend, which excludes anything already resolved
+        by the glossary, the cache, or the entity guard above. That is a
+        deliberately different (smaller, real) number than "every unique
+        string in the document"; a caller wanting the larger number
+        already has it before calling `warm()` and can report it
+        separately.
         """
         batch_size = batch_size or self.backend.max_batch
         todo: list[str] = []
@@ -194,6 +209,10 @@ class Translator:
                     self.translate(src)
             done += len(chunk)
             self.cache.save()
+            emit(
+                on_progress,
+                ProgressEvent(phase="translate", status="active", count=done, total=len(todo)),
+            )
         self.cache.save()
         return done
 

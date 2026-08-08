@@ -290,6 +290,74 @@ def test_translate_pdf_document_builds_its_own_translator_and_context(tmp_path):
     assert list(config.paths.cache_dir.glob("*.json"))
 
 
+def test_process_document_reports_progress_through_all_six_phases(tmp_path):
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=200)
+    page.insert_textbox(
+        fitz.Rect(40, 40, 360, 160), "Hola mundo, este es un documento.",
+        fontsize=12, fontname="helv", align=0,
+    )
+    src = tmp_path / "in.pdf"
+    doc.save(src)
+    doc.close()
+
+    out = tmp_path / "out.pdf"
+    config = _config(tmp_path)
+    guard = EntityGuard(())
+    backend = FakeBackend(translate_fn=lambda s: s.upper(), uses_placeholder_protection=False)
+    tr = Translator(
+        config.paths.cache_dir / "doc.json", backend, cache_namespace="ns",
+        entities=(), verbose=False,
+    )
+    render_ctx = RenderContext(font_resolver=FontResolver(use_bundled_fallback=True))
+
+    events = []
+    process_document(
+        src, out, "in.pdf", tr, guard, render_ctx, config,
+        kind="digital", progress=events.append,
+    )
+
+    phases_seen = [e.phase for e in events]
+    # classify has no "active" (it's synchronous and instant), the rest
+    # all fire active-then-done in pipeline order.
+    assert phases_seen[0] == "classify"
+    for phase in ("ocr", "extract", "translate", "render", "save"):
+        assert phase in phases_seen
+    # not a scan -- OCR reports done directly, with no active event
+    ocr_events = [e for e in events if e.phase == "ocr"]
+    assert len(ocr_events) == 1
+    assert ocr_events[0].status == "done"
+    assert ocr_events[0].detail == "skipped -- not a scan"
+    # every phase ends on "done"
+    for phase in ("classify", "extract", "translate", "render", "save"):
+        assert [e for e in events if e.phase == phase][-1].status == "done"
+
+
+def test_process_document_with_no_progress_callback_is_unaffected(tmp_path):
+    """progress=None (the default) must not change behaviour at all."""
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=200)
+    page.insert_textbox(
+        fitz.Rect(40, 40, 360, 160), "Hola mundo.", fontsize=12, fontname="helv", align=0,
+    )
+    src = tmp_path / "in.pdf"
+    doc.save(src)
+    doc.close()
+
+    out = tmp_path / "out.pdf"
+    config = _config(tmp_path)
+    guard = EntityGuard(())
+    backend = FakeBackend(translate_fn=lambda s: s.upper(), uses_placeholder_protection=False)
+    tr = Translator(
+        config.paths.cache_dir / "doc.json", backend, cache_namespace="ns",
+        entities=(), verbose=False,
+    )
+    render_ctx = RenderContext(font_resolver=FontResolver(use_bundled_fallback=True))
+    report = process_document(src, out, "in.pdf", tr, guard, render_ctx, config, kind="digital")
+    assert out.exists()
+    assert report["translated"] >= 1
+
+
 def test_pages_filter_only_translates_the_selected_page(tmp_path):
     doc = fitz.open()
     for i in range(3):
