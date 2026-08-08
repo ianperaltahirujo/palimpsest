@@ -9,11 +9,20 @@ import { MOCK } from "../config.js";
 import * as api from "../api.js";
 
 const GROUPS = ["companies", "people", "places", "other"];
+const EMPTY_GROUPS = { companies: [], people: [], places: [], other: [] };
 
 export default function Rail({ showSuggested, onCollapse }) {
   const t = useT();
-  const [groups, setGroups] = useState(() => structuredClone(PROTECTED_ENTITIES));
-  const [suggested, setSuggested] = useState(SUGGESTED_ENTITIES);
+  // MOCK-only fixtures -- real mode starts empty and stays empty until
+  // GET /api/entities actually answers (below). Seeding real mode from
+  // the fixture was a real bug: on a failed fetch the fake "Grupo
+  // Meridian"/"Banco Litoral"/"Andres Carreno" names stayed on screen
+  // forever, and worse, apply() PUTs the whole roster back to the server
+  // on any edit -- so adding one real entity while the fixture was still
+  // showing would write the fictional names into the user's actual
+  // entities.toml.
+  const [groups, setGroups] = useState(() => (MOCK ? structuredClone(PROTECTED_ENTITIES) : EMPTY_GROUPS));
+  const [suggested, setSuggested] = useState(() => (MOCK ? SUGGESTED_ENTITIES : []));
   const [draft, setDraft] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
   const count = Object.values(groups).reduce((n, g) => n + g.length, 0);

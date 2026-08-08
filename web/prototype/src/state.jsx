@@ -136,10 +136,26 @@ export function useAppState() {
   return ctx;
 }
 
+// sub below is an i18n key (backend.sub.<id>), resolved with t() in
+// BackendSelector.jsx. Real vendor/label data used in BOTH modes -- not a
+// mock fixture, just declared here alongside the others.
+export const BACKEND_COPY = {
+  gemini: { label: "gemini", needsKey: true },
+  anthropic: { label: "claude", needsKey: true },
+  google: { label: "google machine translation", needsKey: false },
+};
+
 // ---------------- mock fixtures ----------------
 // Entirely fictional -- the de-identified cast from
 // docs/design/protected-entities.md (Grupo Meridian, Banco Litoral, Andres
 // Carreno). Never real corpus material -- see tools/scrub_check.py.
+//
+// MOCK-only, every single one of these -- consumers must gate on `MOCK`
+// before touching any fixture below (Rail.jsx's PROTECTED_ENTITIES/
+// SUGGESTED_ENTITIES were the one place that didn't, and it leaked fake
+// entity names onto the real deployed site with no server reachable --
+// worse, a real edit while the fixture was still showing would PUT the
+// fictional names into the user's actual entities.toml).
 
 export const QUEUE_FILES = [
   { name: "trust-deed-aurora.pdf", kind: "digital", size: "812 KB", pages: 4 },
@@ -224,11 +240,3 @@ export const PROTECTED_ENTITIES = {
 };
 
 export const SUGGESTED_ENTITIES = ["Fideicomiso Aurora Plaza", "Lucia Fernandez Roa"];
-
-// sub below is an i18n key (backend.sub.<id>), resolved with t() in
-// BackendSelector.jsx.
-export const BACKEND_COPY = {
-  gemini: { label: "gemini", needsKey: true },
-  anthropic: { label: "claude", needsKey: true },
-  google: { label: "google machine translation", needsKey: false },
-};
