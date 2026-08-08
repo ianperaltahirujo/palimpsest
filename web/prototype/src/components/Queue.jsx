@@ -12,6 +12,14 @@ function formatBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// The file-type badge used to hardcode "PDF" -- harmless before Office
+// uploads existed, misleading now that .docx/.pptx/.xlsx are real
+// upload targets (see the root README's Quickstart).
+function extLabel(name) {
+  const ext = (name || "").split(".").pop();
+  return ext ? ext.toUpperCase() : "?";
+}
+
 export default function Queue() {
   const { goto, uploads, removeUpload, runEstimate } = useAppState();
   const t = useT();
@@ -58,7 +66,7 @@ export default function Queue() {
         {files.map((f) => (
           <Group key={f.id || f.name} wrap="nowrap" gap={14} p="14px 16px" style={{ border: "1px solid var(--pp-rule)", borderRadius: 3, background: "var(--pp-leaf-raised)" }}>
             <div style={{ width: 34, height: 34, border: "1px solid var(--pp-rule)", borderRadius: 3, display: "grid", placeItems: "center", fontFamily: "var(--mantine-font-family-monospace)", fontSize: 9, color: "var(--pp-ink-soft)", flex: "0 0 auto" }}>
-              PDF
+              {extLabel(f.name)}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <Text fw={600} size="sm" truncate>

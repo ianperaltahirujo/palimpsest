@@ -59,15 +59,22 @@ export default function Running() {
         });
       },
       onDone: (payload) => {
-        if (payload.status === "done") {
-          api.getJob(jobId).then(setJob).catch(() => {});
-          setTimeout(() => goto("results"), 400);
-        } else {
+        // Both branches fetch the job and leave this screen -- a failed
+        // job still has a real Job record (per-file errors, whatever
+        // files DID finish), and Results is what knows how to show
+        // that. Leaving the user stuck on "Running" forever with only a
+        // toast (which autocloses) was the actual bug: the job was
+        // genuinely done, just not successfully, and nothing here ever
+        // said so persistently.
+        api.getJob(jobId).then(setJob).catch(() => {});
+        if (payload.status !== "done") {
           notifications.show({
-            message: payload.error || "The job failed -- see the server log for detail.",
+            message: payload.error || t("running.jobFailed"),
             color: "flag",
+            autoClose: 8000,
           });
         }
+        setTimeout(() => goto("results"), 400);
       },
       onError: () => {
         notifications.show({ message: t("running.connectionLost"), color: "flag" });

@@ -35,13 +35,19 @@ export default function CompareStage() {
   const fileId = file?.file_id;
   const pageCount = MOCK ? 4 : file?.report?.pages || 1;
   const pageIndex = comparePage - 1; // comparePage is 1-indexed, the API's page param is 0-indexed
+  // Edit mode has no equivalent for Office files -- server-side
+  // GET/PATCH /layout reject them outright (pdf.layout's paragraph-rect
+  // model doesn't apply to a word processor's reflow or a slide's shape
+  // tree). Compare still works via office.render's LibreOffice preview.
+  const isOffice = !MOCK && file?.kind === "office";
+  const effectiveMode = isOffice ? "compare" : mode;
 
   useEffect(() => {
-    if (MOCK) return;
+    if (MOCK || isOffice) return;
     setLayout(null);
     setLayoutError(null);
     api.getLayout(jobId, { fileId, page: pageIndex }).then(setLayout, (e) => setLayoutError(e));
-  }, [jobId, fileId, pageIndex]);
+  }, [jobId, fileId, pageIndex, isOffice]);
 
   async function handlePatchLayout(payload) {
     await api.patchLayout(jobId, payload, { fileId });
@@ -58,22 +64,24 @@ export default function CompareStage() {
           <Button variant="default" size="compact-sm" px={6} aria-label={t("compare.prevAria")} onClick={() => setComparePage(Math.max(1, comparePage - 1))}>
             <IconChevronLeft size={14} />
           </Button>
-          <span>{t("compare.page", { n: comparePage })}</span>
+          <span>{t("compare.page", { n: comparePage, total: pageCount })}</span>
           <Button variant="default" size="compact-sm" px={6} aria-label={t("compare.nextAria")} onClick={() => setComparePage(Math.min(pageCount, comparePage + 1))}>
             <IconChevronRight size={14} />
           </Button>
         </div>
-        <SegmentedControl
-          value={mode}
-          onChange={setMode}
-          data={[
-            { label: t("compare.compare"), value: "compare" },
-            { label: t("compare.edit"), value: "edit" },
-          ]}
-        />
+        {!isOffice && (
+          <SegmentedControl
+            value={mode}
+            onChange={setMode}
+            data={[
+              { label: t("compare.compare"), value: "compare" },
+              { label: t("compare.edit"), value: "edit" },
+            ]}
+          />
+        )}
       </div>
 
-      {mode === "compare" ? (
+      {effectiveMode === "compare" ? (
         <PageWipe
           baseSrc={MOCK ? "/sample/output.png" : api.pageUrl(jobId, pageIndex, { side: "output", fileId, v: reflowVersion })}
           baseAlt={t("sample.altOut")}
@@ -84,7 +92,7 @@ export default function CompareStage() {
         <Suspense fallback={<Text c="dimmed" size="sm">{t("compare.loadingLayout")}</Text>}>
           <EditSurface
             layout={layout}
-            active={mode === "edit"}
+            active={effectiveMode === "edit"}
             imgSrc={MOCK ? undefined : api.pageUrl(jobId, pageIndex, { side: "output", fileId, v: reflowVersion })}
             onExport={MOCK ? undefined : handlePatchLayout}
           />
@@ -95,7 +103,7 @@ export default function CompareStage() {
         </Text>
       )}
 
-      {mode === "compare" && MOCK && (
+      {effectiveMode === "compare" && MOCK && (
         <Text ta="center" size="xs" c="dimmed" mt={10}>
           {t("compare.fixtureNote")}
         </Text>
