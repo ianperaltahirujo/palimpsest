@@ -77,6 +77,23 @@ class JobFile:
             "status": self.status, "report": self.report, "error": self.error,
         }
 
+    def _persist_dict(self) -> dict:
+        """Unlike `to_dict()`, includes local filesystem paths -- this
+        goes to the on-disk job record, never to the browser."""
+        d = self.to_dict()
+        d["output_path"] = str(self.output_path) if self.output_path else None
+        d["dual_path"] = str(self.dual_path) if self.dual_path else None
+        return d
+
+    @classmethod
+    def _from_persist_dict(cls, d: dict) -> JobFile:
+        return cls(
+            file_id=d["file_id"], name=d["name"], kind=d["kind"],
+            status=d.get("status", "pending"), report=d.get("report"), error=d.get("error"),
+            output_path=Path(d["output_path"]) if d.get("output_path") else None,
+            dual_path=Path(d["dual_path"]) if d.get("dual_path") else None,
+        )
+
 
 @dataclass
 class Job:
@@ -101,19 +118,72 @@ class Job:
                 "files": [f.to_dict() for f in self.files],
             }
 
+    def _persist_dict(self) -> dict:
+        with self._lock:
+            return {
+                "id": self.id,
+                "status": self.status,
+                "backend": self.backend_name,
+                "dual": self.dual,
+                "created_at": self.created_at,
+                "error": self.error,
+                "files": [f._persist_dict() for f in self.files],
+            }
+
 
 class JobRegistry:
     """One registry per running server process. Job records also mirror
     to a JSON file per job under `jobs_dir`, so a finished job's report
-    survives a server restart even though in-flight progress does not
-    (there is no "resume a job" story here -- see the plan's explicit
-    non-goals)."""
+    -- and now the job list itself -- survives a server restart, even
+    though in-flight progress does not (there is no "resume a job"
+    story here -- see the plan's explicit non-goals: a job that was
+    still queued/running when the process exited has no worker left to
+    finish it, so `_load_existing` marks it failed rather than leaving
+    it stuck "running" forever)."""
 
     def __init__(self, jobs_dir: Path):
         self.jobs_dir = jobs_dir
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
         self._jobs: dict[str, Job] = {}
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="palimpsest-job")
+        self._load_existing()
+
+    def _load_existing(self) -> None:
+        for path in sorted(self.jobs_dir.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                log.warning("could not read persisted job record %s", path, exc_info=True)
+                continue
+            job = self._job_from_persist_dict(data)
+            if job is not None:
+                self._jobs[job.id] = job
+
+    def _job_from_persist_dict(self, data: dict) -> Job | None:
+        try:
+            files = [JobFile._from_persist_dict(f) for f in data["files"]]
+            job = Job(
+                id=data["id"], files=files, backend_name=data["backend"],
+                dual=data.get("dual", False), status=data["status"],
+                created_at=data.get("created_at", time.time()), error=data.get("error"),
+            )
+        except (KeyError, TypeError):
+            log.warning("skipping malformed persisted job record: %r", data, exc_info=True)
+            return None
+
+        if job.status in ("queued", "running"):
+            for jf in job.files:
+                if jf.status in ("pending", "running"):
+                    jf.status = "failed"
+                    jf.error = jf.error or "server restarted before this file finished"
+            job.status = "failed"
+            job.error = job.error or "server restarted while this job was in progress"
+            self._persist(job)
+        # No worker is running for a restored job, so any SSE stream that
+        # subscribes now would otherwise block on an empty queue forever
+        # -- the sentinel makes it end immediately with a job-done event.
+        job._queue.put(None)
+        return job
 
     def create(
         self, uploaded: list[UploadedFile], backend_name: str, dual: bool
@@ -146,7 +216,7 @@ class JobRegistry:
     def _persist(self, job: Job) -> None:
         try:
             (self.jobs_dir / f"{job.id}.json").write_text(
-                json.dumps(job.to_dict(), indent=2), encoding="utf-8"
+                json.dumps(job._persist_dict(), indent=2), encoding="utf-8"
             )
         except OSError:
             log.warning("could not persist job %s", job.id, exc_info=True)
