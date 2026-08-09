@@ -66,7 +66,7 @@ export default function Overview() {
         {t("overview.cta")}
       </Button>
 
-      <Dropzone onDrop={handleDrop} mt={40} p={28} accept={UPLOAD_ACCEPT} variant="filled" rejectColor="flag">
+      <Dropzone onDrop={handleDrop} mt={40} p={28} accept={UPLOAD_ACCEPT} acceptColor="accept" rejectColor="flag">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", minHeight: 76 }}>
           <div>
             <Text fw={700} size="sm">

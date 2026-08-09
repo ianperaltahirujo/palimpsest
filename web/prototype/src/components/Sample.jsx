@@ -52,7 +52,7 @@ export default function Sample() {
         {t("sample.caption")}
       </Text>
 
-      <Dropzone onDrop={handleFiles} mt={26} accept={UPLOAD_ACCEPT} variant="filled" rejectColor="flag">
+      <Dropzone onDrop={handleFiles} mt={26} accept={UPLOAD_ACCEPT} acceptColor="accept" rejectColor="flag">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <Text fw={700} size="sm">
