@@ -5,6 +5,24 @@ All notable changes to this project are documented here. Format follows
 does not yet promise strict [Semantic Versioning](https://semver.org/)
 compatibility guarantees (pre-1.0).
 
+## [0.2.2] — 2026-08-09
+
+### Fixed
+
+- v0.2.1's fix made the README's logo render with a visible background
+  box on GitHub -- GitHub applies its own background-box styling to any
+  image loaded from an absolute URL (confirmed for both
+  raw.githubusercontent.com and a third-party CDN), never to a same-repo
+  relative path. README.md is back to fully relative links/images (a
+  clean render on GitHub, which is what most people actually browse);
+  a new `tools/render_pypi_readme.py` generates a separate
+  `README.pypi.md` with everything absolute, which is what
+  `pyproject.toml`'s `readme` field now points at. CI fails if the two
+  drift out of sync.
+- The Dockerfile's build image still referenced `README.md` after that
+  field changed, so `pip install` failed hatchling's readme-file-exists
+  check immediately -- fixed to copy `README.pypi.md` instead.
+
 ## [0.2.1] — 2026-08-09
 
 ### Fixed
@@ -92,6 +110,7 @@ Initial extraction from a private client pipeline: the CLI and library
 matching, honest translation cache with per-entry status), with no
 server or web UI yet.
 
+[0.2.2]: https://github.com/ianperaltahirujo/palimpsest/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/ianperaltahirujo/palimpsest/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ianperaltahirujo/palimpsest/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ianperaltahirujo/palimpsest/releases/tag/v0.1.0
