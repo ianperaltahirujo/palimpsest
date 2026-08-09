@@ -79,6 +79,12 @@ a build somewhere other than this server (e.g. GitHub Pages, via
 ([LibreOffice](https://www.libreoffice.org/download/download/), optional
 and only for that preview — translation itself never needs it).
 
+A standalone frontend build's default expectation is that each visitor runs their own
+`palimpsest serve` locally. For a zero-command deployment instead — a visitor opens the page,
+types an API key, and translates — see [`docs/deployment.md`](docs/deployment.md) for running the
+backend itself somewhere persistent (a `Dockerfile` and a Render walkthrough), plus what
+per-visitor isolation that requires and doesn't guarantee.
+
 ## Why this exists, not just what it does
 
 Generic "translate this PDF" tools tend to do one of two things badly:

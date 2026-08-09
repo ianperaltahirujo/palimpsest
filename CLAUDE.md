@@ -173,6 +173,20 @@ exists, just not yours" to whoever's guessing. Without this, per-visitor KEY sco
 visitor read another's uploaded documents or translation results by guessing a file/job id (both are random
 UUIDs, but "guessing" here really means the id leaked some other way — e.g. shared over a link).
 
+`[limits]` (`config.model.LimitsConfig`) adds two small, server-only guardrails on top of all this — `max_upload_bytes`
+(checked in `uploads.validate_and_save`) and `max_concurrent_jobs_per_visitor` (checked via `JobRegistry.
+active_count_for` in `create_job`, → HTTP 429 over the cap). Neither is a rate-limiting framework; both exist
+because per-visitor API keys bound *API cost* to whoever's key is attached, not the *compute* (OCR, disk) the host
+still pays for regardless.
+
+**Running this server somewhere other than localhost, for real** — not just a standalone frontend build reaching
+back to a local `palimpsest serve` — is `Dockerfile` (repo root) plus `cli.py`'s `--api-only` flag (skips the
+static SPA mount like `--dev` does, but does NOT fold `--dev-origin` into the allowed origins the way `--dev`
+does — pair it with real `--allow-origin` flags instead). See [`docs/deployment.md`](docs/deployment.md) for the
+full walkthrough (a Render free-tier deployment, as one option) and its own honest accounting of what a
+no-persistent-disk host means for this project's data (uploads, cache, per-visitor keys — all of it is gone on
+restart, by design, not by oversight).
+
 Jobs run on one `ThreadPoolExecutor(max_workers=1)` per server process (`server/jobs.py`) — deliberate, not a
 missing optimization; a local single-user tool has no reason to translate concurrently. `JobRegistry` persists each
 job's state to disk on every change and reloads it on startup; a job still `queued`/`running` when the process

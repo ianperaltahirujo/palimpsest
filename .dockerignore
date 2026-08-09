@@ -1,0 +1,55 @@
+# Mirrors .gitignore's sensitive/build-artifact entries -- none of this
+# belongs in the build context, let alone the image. See Dockerfile.
+
+# --- Confidential / private user data -------------------------------------
+private/
+*.private.toml
+/palimpsest.toml
+.palimpsest/
+
+# Working corpora (user's own source/output documents)
+corpus/
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+!examples/**/*.pdf
+!examples/**/*.docx
+!examples/**/*.xlsx
+!examples/**/*.pptx
+
+# --- Secrets -------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.key
+
+# --- Python ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# --- Editor / OS / VCS -----------------------------------------------------
+.git/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Not needed for an API-only image --------------------------------------
+# The frontend is a separate deployment (GitHub Pages); this image never
+# builds or serves it. tests/docs aren't needed at runtime either.
+web/
+tests/
+docs/
+.github/

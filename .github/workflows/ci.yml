@@ -81,3 +81,34 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    # Builds and smoke-tests the deployment image (see Dockerfile,
+    # docs/deployment.md) on every push -- this is real verification that
+    # local Docker unavailability in dev can't provide, and it catches a
+    # broken Dockerfile the moment it happens, not the next time someone
+    # tries to actually deploy.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build image
+        run: docker build -t palimpsest-server .
+
+      - name: Run container and wait for /api/health
+        run: |
+          docker run -d --name palimpsest -p 8765:8765 palimpsest-server
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:8765/api/health > /dev/null; then
+              echo "health check passed"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "server never became healthy -- container logs:"
+          docker logs palimpsest
+          exit 1
+
+      - name: Container logs (always, for debugging)
+        if: always()
+        run: docker logs palimpsest

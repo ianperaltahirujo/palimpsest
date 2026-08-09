@@ -413,7 +413,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
     config, _entities, _glossary, _documents, _post_rules = load_context(args.config)
 
     static_dir = None
-    if not args.dev:
+    if not args.dev and not args.api_only:
         packaged = Path(__file__).resolve().parent / "server" / "static"
         static_dir = Path(args.static) if args.static else packaged
 
@@ -510,6 +510,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument(
         "--dev-origin", default="http://localhost:5173",
         help="the Vite dev server's origin, allowed cross-origin only with --dev",
+    )
+    p_serve.add_argument(
+        "--api-only", action="store_true",
+        help="serve the API only, no static SPA mount -- for a production API-only host "
+        "(e.g. a Docker deployment fronted by a separately-published frontend build). "
+        "Unlike --dev, does NOT fold --dev-origin into the allowed origins; pair with "
+        "one or more --allow-origin flags naming the real frontend origin(s) instead.",
     )
     p_serve.add_argument(
         "--allow-origin", action="append", default=[],

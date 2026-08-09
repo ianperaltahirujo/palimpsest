@@ -1,0 +1,17 @@
+schema = 1
+
+# Server-only overrides for a public, hosted instance (see
+# docs/deployment.md). All other sections are left at their packaged
+# defaults. Paths are NOT overridden here -- WORKDIR is /app in the
+# image, so the default relative paths (.palimpsest/work, etc.) resolve
+# to /app/.palimpsest/... automatically. There is no persistent volume
+# on Render's free tier, so none of this survives a restart -- an
+# accepted tradeoff (see docs/deployment.md), not a bug.
+
+[limits]
+# Tighter than the packaged default (50 MB) -- a public host with no
+# billing relationship to its visitors has less reason to accept as
+# large an upload as a local single-user install does. Raise this if
+# you're hosting for known/trusted visitors instead.
+max_upload_bytes = 20971520          # 20 MB
+max_concurrent_jobs_per_visitor = 1
