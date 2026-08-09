@@ -41,6 +41,20 @@ def test_project_overrides_one_threshold_without_resetting_others(tmp_path):
     assert config.thresholds.min_text_size_scan == 7.0
 
 
+def test_load_none_returns_default_ocr_jobs():
+    config = loader.load(None)
+    assert config.ocr.jobs is None
+
+
+def test_project_sets_ocr_jobs(tmp_path):
+    cfg = tmp_path / "palimpsest.toml"
+    cfg.write_text("[ocr]\njobs = 1\n", encoding="utf-8")
+    config = loader.load(cfg)
+    assert config.ocr.jobs == 1
+    # Untouched OCR settings keep their packaged default.
+    assert config.ocr.oversample == 400
+
+
 def test_load_none_returns_default_limits():
     config = loader.load(None)
     assert config.limits.max_upload_bytes == 50 * 1024 * 1024

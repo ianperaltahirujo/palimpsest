@@ -119,6 +119,19 @@ class OcrConfig:
     oversample: int = 400
     mode: str = "skip-text"
     optimize: int = 1
+    jobs: int | None = None
+    """`None` (the default) lets `ocrmypdf` pick its own worker count --
+    `multiprocessing.cpu_count()`, the HOST's reported core count, not a
+    cgroup-aware container quota. Each concurrent worker rasterizes and
+    OCRs a different page in its own process, holding a full raster
+    buffer (inflated further by `oversample` above) -- on a shared,
+    memory-constrained host this can multiply peak memory well past what
+    a single page alone would need. A real 3-page scan OOM-killed a
+    512MB Render instance under exactly this default (see
+    docs/deployment.md) before this field existed. Set to a real number
+    (`docker/palimpsest.toml` sets `1`) to cap it; `None` preserves
+    today's behavior for local installs, where the host's own resources
+    are presumably known and not shared."""
 
 
 @dataclass(frozen=True)

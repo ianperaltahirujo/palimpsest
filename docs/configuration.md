@@ -123,3 +123,15 @@ visitor (see `SECURITY.md`) — a plain local `palimpsest translate` invocation 
 1) caps how many jobs one visitor can have queued/running at once. Neither is a real rate limiter —
 they're small, deliberately blunt guardrails against one visitor accidentally (or carelessly)
 monopolizing a shared host's compute, not a defense against a determined adversary.
+
+## OCR
+
+Most `[ocr]` fields (`language`, `oversample`, `mode`, `optimize`) tune OCR *quality*; `jobs` is
+different — it's a memory lever, and it matters most on a hosted deployment. Left unset (the
+default), `ocrmypdf` picks its own worker count via `multiprocessing.cpu_count()` — the **host's**
+reported core count, not a container's actual memory allocation — and runs that many pages'
+rasterize-and-OCR concurrently, each worker holding a full page raster buffer. On a
+memory-constrained shared host this can multiply peak memory well past what OCR-ing one page at a
+time would need: a real 3-page scan OOM-killed a 512MB Render instance under exactly this default
+(see [`docs/deployment.md`](deployment.md)). `docker/palimpsest.toml` now sets `jobs = 1` for
+exactly this reason — raise it if you're hosting somewhere with real memory headroom.

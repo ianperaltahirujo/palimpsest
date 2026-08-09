@@ -159,6 +159,7 @@ export const STRINGS = {
     "running.connectionLost": "Lost the connection to the server while running -- the job may still be in progress.",
     "running.cancelNote": "Cancelling abandons the result -- an in-flight OCR or translation call can't be interrupted mid-request, only left to finish and discarded.",
     "running.jobFailed": "The job failed -- see the results page for detail.",
+    "running.jobLost": "Lost track of this job -- the server may have restarted. Nothing was translated silently; you'll need to start over.",
 
     "results.titleRest": "of {total} paragraphs translated.",
     "results.noJobTitle": "No results yet",
@@ -365,6 +366,7 @@ export const STRINGS = {
     "running.connectionLost": "Se perdió la conexión con el servidor durante el proceso -- el trabajo podría seguir en curso.",
     "running.cancelNote": "Cancelar descarta el resultado -- una llamada de OCR o traducción en curso no se puede interrumpir a mitad de camino, solo se deja terminar y se descarta.",
     "running.jobFailed": "El trabajo falló -- ver la página de resultados para más detalle.",
+    "running.jobLost": "Se perdió el rastro de este trabajo -- el servidor podría haberse reiniciado. No se tradujo nada en silencio; tendrás que empezar de nuevo.",
 
     "results.titleRest": "de {total} párrafos traducidos.",
     "results.noJobTitle": "Aún no hay resultados",

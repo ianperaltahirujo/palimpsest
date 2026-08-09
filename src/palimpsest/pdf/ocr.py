@@ -72,8 +72,14 @@ def ensure_ocr(src: Path, out_dir: Path, key: str, config: OcrConfig) -> Path:
         "--output-type", "pdf",
         "--optimize", str(config.optimize),
         "--quiet",
-        str(src), str(out),
     ]
+    if config.jobs is not None:
+        # Caps concurrent per-page rasterize+OCR worker processes --
+        # ocrmypdf's own default (unset) is multiprocessing.cpu_count(),
+        # the HOST's core count, which can badly over-subscribe memory on
+        # a shared, resource-constrained host. See OcrConfig.jobs.
+        cmd += ["--jobs", str(config.jobs)]
+    cmd += [str(src), str(out)]
     res = subprocess.run(cmd, env=env, capture_output=True, text=True)
     if res.returncode != 0 or not out.exists():
         raise DependencyError(

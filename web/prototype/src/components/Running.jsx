@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Progress, Text, Title } from "@mantine/core";
+import { Button, Loader, Progress, Text, Title } from "@mantine/core";
 import { IconCheck } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { PHASES } from "../state.jsx";
@@ -8,8 +8,28 @@ import { useT } from "../i18n.jsx";
 import { MOCK } from "../config.js";
 import * as api from "../api.js";
 
-const ICON = { done: <IconCheck size={13} />, active: "⟳" };
+// A real spinner, not a static glyph -- the previous "⟳" character never
+// moved, which made a genuinely long phase (OCR, or Translate against a
+// slow/rate-limited backend) look identical to a frozen tab. A real
+// Loader is the one honest signal "still working" has over "stopped
+// working" when nothing else on screen is changing yet.
+const ICON = { done: <IconCheck size={13} />, active: <Loader size={13} color="register" /> };
 const PHASE_KEYS = ["classify", "ocr", "extract", "translate", "render", "save"];
+
+// How long without ANY server signal (an SSE progress event, or a
+// successful health probe) before treating this job as possibly gone --
+// generous on purpose. A real single phase (Translate, against a slow or
+// rate-limited backend) can legitimately go quiet for a while between
+// progress events; this must not fire on that, only on something that
+// looks like the job has actually stopped existing.
+const STALL_MS = 90_000;
+const STALL_CHECK_INTERVAL_MS = 15_000;
+// Collapses a burst of EventSource auto-reconnect `error` events (it
+// retries repeatedly on its own, each attempt re-firing onerror) into at
+// most one real health check every few seconds, and also rate-limits the
+// stall-interval's own checks relative to any onError-triggered one --
+// both paths share this one timestamp.
+const PROBE_DEBOUNCE_MS = 4_000;
 
 function initialPhases() {
   return PHASE_KEYS.map((key) => ({ key, status: "pending", detail: null, count: 0, total: 0 }));
@@ -30,14 +50,98 @@ export default function Running() {
   const [fileIndex, setFileIndex] = useState(0);
   const [fileCount, setFileCount] = useState(uploads.length || 1);
 
+  // Tracks whether the job might be GONE, not just slow -- the SSE
+  // stream is the only source of progress, but it has no way to tell
+  // "still working" from "the server died and nothing will ever arrive
+  // again" on its own (a native EventSource just keeps silently
+  // retrying a URL that may 404 forever; see api.js's watchJob). These
+  // refs (not state -- nothing here should re-render on every tick)
+  // back a periodic reconciliation against the server's actual GET
+  // /api/jobs/{id}, which IS able to tell the difference.
+  const lastEventAtRef = useRef(0);
+  const lastProbeAtRef = useRef(0);
+  const stalledNotifiedRef = useRef(false);
+
   useEffect(() => {
     if (MOCK || !jobId) return;
     setPhases(initialPhases());
     setFileIndex(0);
     setFileCount(uploads.length || 1);
+    lastEventAtRef.current = Date.now();
+    lastProbeAtRef.current = 0;
+    stalledNotifiedRef.current = false;
+
+    // Shared by onDone (the normal path -- the SSE stream itself
+    // reported completion) and checkJobHealth (the recovery path --
+    // the stream never told us, but a direct GET /api/jobs/{id} shows
+    // the job actually finished). A failed job still has a real Job
+    // record (per-file errors, whatever files DID finish), and Results
+    // is what knows how to show that -- leaving the user stuck here
+    // with only a toast (which autocloses) was the original bug: the
+    // job was genuinely done, just not successfully, and nothing here
+    // ever said so persistently.
+    function finishWithJob(freshJob) {
+      setJob(freshJob);
+      if (freshJob.status !== "done") {
+        notifications.show({
+          message: freshJob.error || t("running.jobFailed"),
+          color: "flag",
+          autoClose: 8000,
+        });
+      }
+      setTimeout(() => goto("results"), 400);
+    }
+
+    // The one authoritative check, called from both a real SSE `error`
+    // event and a stall timer that fires even if `error` never does
+    // (e.g. a proxy holding a dead TCP connection open with no FIN/RST
+    // ever reaching the browser). Debounced across BOTH callers via one
+    // shared timestamp, since EventSource's own auto-reconnect can fire
+    // `error` repeatedly in a burst and the stall timer ticks on its own
+    // schedule regardless.
+    function checkJobHealth() {
+      const now = Date.now();
+      if (now - lastProbeAtRef.current < PROBE_DEBOUNCE_MS) return;
+      lastProbeAtRef.current = now;
+      api
+        .getJob(jobId)
+        .then((freshJob) => {
+          if (freshJob.status === "done" || freshJob.status === "failed") {
+            // The SSE stream missed its own terminal event -- we still
+            // have the real, finished job, so finish exactly as if it
+            // had arrived normally.
+            finishWithJob(freshJob);
+            return;
+          }
+          // Still genuinely queued/running server-side -- a transient
+          // blip, not job loss. EventSource is already retrying on its
+          // own; only surface this once per stall episode, not on every
+          // debounced re-check.
+          if (!stalledNotifiedRef.current) {
+            stalledNotifiedRef.current = true;
+            notifications.show({ message: t("running.connectionLost"), color: "flag" });
+          }
+        })
+        .catch(() => {
+          // Can't even ask -- unreachable server, or a 404 because the
+          // job (and everything about it) is genuinely gone, e.g. a
+          // hosted deployment's process restarted and lost all
+          // in-memory/on-disk job state (see docs/deployment.md).
+          // Nothing left to watch or wait for.
+          setJob(null);
+          notifications.show({ message: t("running.jobLost"), color: "flag", autoClose: 8000 });
+          setTimeout(() => goto("results"), 400);
+        });
+    }
+
+    const stallCheck = setInterval(() => {
+      if (Date.now() - lastEventAtRef.current > STALL_MS) checkJobHealth();
+    }, STALL_CHECK_INTERVAL_MS);
 
     const unsubscribe = api.watchJob(jobId, {
       onEvent: (payload) => {
+        lastEventAtRef.current = Date.now();
+        stalledNotifiedRef.current = false;
         setFileIndex(payload.file_index);
         setFileCount(payload.file_count);
         setPhases((prev) => {
@@ -59,13 +163,6 @@ export default function Running() {
         });
       },
       onDone: (payload) => {
-        // Both branches fetch the job and leave this screen -- a failed
-        // job still has a real Job record (per-file errors, whatever
-        // files DID finish), and Results is what knows how to show
-        // that. Leaving the user stuck on "Running" forever with only a
-        // toast (which autocloses) was the actual bug: the job was
-        // genuinely done, just not successfully, and nothing here ever
-        // said so persistently.
         api.getJob(jobId).then(setJob).catch(() => {});
         if (payload.status !== "done") {
           notifications.show({
@@ -76,11 +173,12 @@ export default function Running() {
         }
         setTimeout(() => goto("results"), 400);
       },
-      onError: () => {
-        notifications.show({ message: t("running.connectionLost"), color: "flag" });
-      },
+      onError: checkJobHealth,
     });
-    return unsubscribe;
+    return () => {
+      clearInterval(stallCheck);
+      unsubscribe();
+    };
   }, [jobId, uploads.length, goto, setJob, t]);
 
   useEffect(() => {

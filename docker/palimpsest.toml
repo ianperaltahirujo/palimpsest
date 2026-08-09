@@ -15,3 +15,12 @@ schema = 1
 # you're hosting for known/trusted visitors instead.
 max_upload_bytes = 20971520          # 20 MB
 max_concurrent_jobs_per_visitor = 1
+
+[ocr]
+# A real 3-page scan OOM-killed this instance (Render free tier, 512MB)
+# before this was set: ocrmypdf's own default is to run one worker
+# process PER CPU CORE THE HOST REPORTS, each holding a full page raster
+# buffer, and Render's shared host can report more cores than this
+# tier's actual memory allocation can back. See docs/deployment.md and
+# config.model.OcrConfig.jobs.
+jobs = 1

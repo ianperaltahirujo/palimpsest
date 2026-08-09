@@ -74,6 +74,55 @@ def test_runs_ocrmypdf_and_returns_output_path(tmp_path, monkeypatch):
     assert "--oversample" in captured_cmd and "400" in captured_cmd
 
 
+def test_jobs_flag_absent_by_default(tmp_path, monkeypatch):
+    """OcrConfig.jobs defaults to None -- preserves ocrmypdf's own
+    default (all detected CPUs) for local installs, unchanged from
+    before this field existed."""
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: object())
+    src = _touch(tmp_path / "scan.pdf")
+    work = tmp_path / "work"
+
+    class _Result:
+        returncode = 0
+        stderr = ""
+
+    captured_cmd = []
+
+    def _fake_run(cmd, env, capture_output, text):
+        captured_cmd.extend(cmd)
+        (work / "key_ocr.pdf").write_bytes(b"ocred")
+        return _Result()
+
+    monkeypatch.setattr(ocr_mod.subprocess, "run", _fake_run)
+    ocr_mod.ensure_ocr(src, work, "key", OcrConfig())
+    assert "--jobs" not in captured_cmd
+
+
+def test_jobs_flag_added_when_configured(tmp_path, monkeypatch):
+    """Caps ocrmypdf's own concurrent-worker default -- the fix for the
+    real OOM incident on the hosted deployment (docker/palimpsest.toml
+    sets jobs=1)."""
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: object())
+    src = _touch(tmp_path / "scan.pdf")
+    work = tmp_path / "work"
+
+    class _Result:
+        returncode = 0
+        stderr = ""
+
+    captured_cmd = []
+
+    def _fake_run(cmd, env, capture_output, text):
+        captured_cmd.extend(cmd)
+        (work / "key_ocr.pdf").write_bytes(b"ocred")
+        return _Result()
+
+    monkeypatch.setattr(ocr_mod.subprocess, "run", _fake_run)
+    ocr_mod.ensure_ocr(src, work, "key", OcrConfig(jobs=1))
+    assert "--jobs" in captured_cmd
+    assert captured_cmd[captured_cmd.index("--jobs") + 1] == "1"
+
+
 def test_force_ocr_mode_uses_force_ocr_flag(tmp_path, monkeypatch):
     monkeypatch.setattr(importlib.util, "find_spec", lambda name: object())
     src = _touch(tmp_path / "scan.pdf")

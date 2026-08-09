@@ -19,8 +19,9 @@ here creates external accounts or spends money on your behalf.
   (Office file *preview* degrades to a clean 503 without it; OCR has no such fallback, so
   `tesseract-ocr`/`ghostscript`/`qpdf` are installed and LibreOffice deliberately isn't, to keep
   the image smaller).
-- `docker/palimpsest.toml`: the one config file baked into the image. Only overrides `[limits]`
-  (a smaller `max_upload_bytes` than the local default) -- every other setting is a packaged
+- `docker/palimpsest.toml`: the one config file baked into the image. Overrides `[limits]`
+  (a smaller `max_upload_bytes` than the local default) and `[ocr].jobs` (caps ocrmypdf's own
+  concurrent-worker default -- see "OCR memory" below) -- every other setting is a packaged
   default, and paths are left alone entirely (the image's `WORKDIR` is `/app`, so the default
   relative paths like `.palimpsest/work` already resolve correctly inside the container).
 - `--api-only` (new CLI flag, alongside the existing `--dev`): skips the static SPA mount without
@@ -42,6 +43,35 @@ a quiet period pays a real cold-start cost (the container has to boot from scrat
 - This is an accepted, deliberate tradeoff for a $0 budget, not something this setup tries to
   paper over. If that's not acceptable, the fix is a paid tier with a persistent disk (Render or
   otherwise) and pointing `[paths]` at it in `docker/palimpsest.toml` -- out of scope here.
+
+## OCR memory (learned from a real incident)
+
+Translating a real 3-page scanned PDF on this exact hosting setup OOM-killed the Render
+instance -- confirmed via Render's own dashboard event log: *"Ran out of memory (used over
+512MB) while running your code."* The job vanished without a trace (a plain `404 unknown job`
+on the next check, not a `"failed"` status) because the replacement container's filesystem is
+completely empty -- see "The tradeoff you're accepting" above; this is that tradeoff showing up
+for real, not a separate bug.
+
+Root cause: `ocrmypdf` (invoked by `pdf/ocr.py::ensure_ocr()`) defaults to one worker process
+**per CPU core the host reports** -- not a container's actual memory allocation -- and each
+concurrent worker holds a full page raster buffer. Render's shared infrastructure can report
+more cores than a free-tier instance's real 512MB can back. `docker/palimpsest.toml` now sets
+`[ocr] jobs = 1` to cap this (see `docs/configuration.md`'s OCR section and
+`config.model.OcrConfig.jobs`'s docstring for the full reasoning) -- confirmed via a real
+before/after test against this exact deployment with the same document that originally failed.
+
+This substantially reduces the risk for typical few-page documents but does **not** eliminate it
+for arbitrarily large or complex scans on a 512MB tier -- Ghostscript/Tesseract memory still
+scales with page complexity even at `jobs=1`. If a large scan still OOMs, the honest fixes are a
+paid tier with more memory, or a scan-specific page/size cap tighter than `[limits]` already
+provides -- neither is built here yet.
+
+Separately, the frontend (`Running.jsx`) now detects a job that's genuinely vanished or gone
+silent -- instead of freezing forever on "OCR: waiting," it periodically checks the job's real
+server-side status and, if it's gone, says so plainly and returns to a clean state instead of a
+silent hang. That doesn't recover the lost work (nothing can, on this hosting tier), but it stops
+the UI from lying about what happened.
 
 ## Render setup (your own steps)
 

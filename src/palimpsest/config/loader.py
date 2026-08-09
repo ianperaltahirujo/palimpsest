@@ -183,6 +183,7 @@ def load(config_path: Path | None) -> Config:
             oversample=ocr.get("oversample", default_ocr.oversample),
             mode=ocr.get("mode", default_ocr.mode),
             optimize=ocr.get("optimize", default_ocr.optimize),
+            jobs=ocr.get("jobs", default_ocr.jobs),
         ),
         thresholds=ThresholdsConfig(
             min_text_size=thresholds.get("min_text_size", default_thresholds.min_text_size),
