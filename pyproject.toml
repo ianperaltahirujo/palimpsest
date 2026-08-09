@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "palimpsest-translate"
-version = "0.1.0"
+version = "0.2.0"
 description = "Layout-preserving document translation: same pages, same artwork, same typography -- only the words change."
 readme = "README.md"
 license = "Apache-2.0"
@@ -51,8 +51,10 @@ all = ["palimpsest-translate[anthropic,gemini,ocr,server]"]
 palimpsest = "palimpsest.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/ianperaltahirujo/palimpsest"
+Homepage = "https://ianperaltahirujo.github.io/palimpsest/"
+Repository = "https://github.com/ianperaltahirujo/palimpsest"
 Issues = "https://github.com/ianperaltahirujo/palimpsest/issues"
+Changelog = "https://github.com/ianperaltahirujo/palimpsest/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/palimpsest"]

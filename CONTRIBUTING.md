@@ -28,6 +28,25 @@ rules exist specifically to keep it that way:
   needs one `@pytest.mark.network` (or `@pytest.mark.ocr` for a real
   Tesseract dependency) — both are deselected in CI by default.
 
+## Releasing
+
+Only maintainers with PyPI trusted-publisher access can do this.
+
+1. Bump the version in **both** `pyproject.toml`'s `version` and
+   `src/palimpsest/__init__.py`'s `__version__` — there's no single
+   source of truth between them, and `.github/workflows/release.yml`
+   fails the release on purpose if they (or the tag) disagree.
+2. Add a section to `CHANGELOG.md` for the new version.
+3. Commit, push, confirm CI is green.
+4. Tag and push: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
+5. `gh release create vX.Y.Z --notes-file <(sed -n '/## \[X.Y.Z\]/,/## \[/p' CHANGELOG.md | head -n -1)`
+   (or just paste that version's CHANGELOG section into the release notes
+   by hand). Publishing the release triggers `release.yml`, which builds,
+   checks, and publishes to PyPI via Trusted Publishing (OIDC) — no API
+   token is stored anywhere in this repo.
+6. Once PyPI shows the new version, sanity-check it in a clean venv:
+   `pip install palimpsest-translate==X.Y.Z && palimpsest --version`.
+
 ## Beyond that
 
 Open an issue before a large PR, keep changes scoped to one concern, and

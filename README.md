@@ -1,8 +1,6 @@
 <h1 align="center">
-  <a href="https://ianperaltahirujo.github.io/palimpsest/">
-    <img src="docs/assets/logo.png" width="48" height="48" valign="middle" alt="palimpsest logo — two overlapping page outlines in register">
-    palimpsest
-  </a>
+  <a href="https://ianperaltahirujo.github.io/palimpsest/"><img src="docs/assets/logo.png" width="48" height="48" valign="middle" alt="palimpsest logo — two overlapping page outlines in register"></a>
+  palimpsest
 </h1>
 
 <p align="center">

@@ -1,0 +1,57 @@
+name: Release to PyPI
+
+# Fires on a GitHub Release being PUBLISHED, not on a tag push -- creating
+# the tag (or a draft release) is harmless on its own; nothing reaches
+# PyPI until the release is deliberately published. This also means a
+# misconfigured trusted publisher can't fail a bare `git push --tags`.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/palimpsest-translate
+    permissions:
+      # Required for PyPI's Trusted Publishing (OIDC) -- no API token
+      # exists anywhere in this repo or its secrets.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tooling
+        run: pip install build twine
+
+      # pyproject.toml's version and __init__.py's __version__ are two
+      # separate literals (see config/model.py's own docstring convention
+      # of calling out un-DRY-able duplication) -- this catches the
+      # release tag drifting from either one BEFORE anything is built,
+      # rather than shipping a mislabeled artifact to PyPI.
+      - name: Verify the release tag matches the package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          INIT_VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from palimpsest import __version__; print(__version__)")
+          echo "tag=$TAG pyproject=$PYPROJECT_VERSION __init__=$INIT_VERSION"
+          if [ "$TAG" != "$PYPROJECT_VERSION" ] || [ "$TAG" != "$INIT_VERSION" ]; then
+            echo "::error::version mismatch -- tag=$TAG pyproject.toml=$PYPROJECT_VERSION __init__.py=$INIT_VERSION"
+            exit 1
+          fi
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check package metadata
+        run: twine check dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

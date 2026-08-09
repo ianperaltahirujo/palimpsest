@@ -59,6 +59,8 @@ Thumbs.db
 /CLAUDE.md
 /CODEX.md
 /handoff.md
+/changes.md
+.agents/
 
 # --- JS (web/prototype) ---------------------------------------------------
 node_modules/
