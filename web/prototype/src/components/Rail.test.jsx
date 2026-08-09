@@ -145,3 +145,45 @@ describe("entity profiles: save, load, delete", () => {
     expect(screen.getByText("No saved profiles yet.")).toBeInTheDocument();
   });
 });
+
+describe("remove all + undo", () => {
+  it("clears every protected entity and shows an Undo notification", async () => {
+    api.getEntities.mockResolvedValue({
+      companies: ["Acme, S.A."], people: ["Andres Carreno"], places: [], other: [],
+    });
+    api.putEntities.mockResolvedValue({});
+    renderRail();
+    await screen.findByText("Acme, S.A.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove all" }));
+
+    await waitFor(() => expect(screen.queryByText("Acme, S.A.")).not.toBeInTheDocument());
+    expect(screen.queryByText("Andres Carreno")).not.toBeInTheDocument();
+    expect(screen.getByText("All protected entities removed.")).toBeInTheDocument();
+    expect(api.putEntities).toHaveBeenLastCalledWith(
+      expect.objectContaining({ companies: [], people: [] }),
+    );
+  });
+
+  it("Undo restores the exact prior roster", async () => {
+    api.getEntities.mockResolvedValue({
+      companies: ["Acme, S.A."], people: ["Andres Carreno"], places: [], other: [],
+    });
+    api.putEntities.mockResolvedValue({});
+    renderRail();
+    await screen.findByText("Acme, S.A.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove all" }));
+    await waitFor(() => expect(screen.queryByText("Acme, S.A.")).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    expect(await screen.findByText("Acme, S.A.")).toBeInTheDocument();
+    expect(screen.getByText("Andres Carreno")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(api.putEntities).toHaveBeenLastCalledWith(
+        expect.objectContaining({ companies: ["Acme, S.A."], people: ["Andres Carreno"] }),
+      ),
+    );
+  });
+});

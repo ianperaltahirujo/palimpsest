@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActionIcon, Box, Group, Menu, Text, TextInput, Tooltip } from "@mantine/core";
 import { IconLayoutSidebarLeftCollapse } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
@@ -33,6 +33,10 @@ export default function Rail({ showSuggested, onCollapse }) {
   // save/delete -- nothing else in this app writes pp-entity-profiles.
   const [profiles, setProfiles] = useState(() => getProfiles());
   const [profileName, setProfileName] = useState("");
+  // The pre-clear snapshot "Remove all" stashes so its Undo notification
+  // can restore it -- a ref, not state, since it never drives a render
+  // on its own.
+  const preClearSnapshotRef = useRef(null);
   const count = Object.values(groups).reduce((n, g) => n + g.length, 0);
 
   useEffect(() => {
@@ -99,6 +103,34 @@ export default function Rail({ showSuggested, onCollapse }) {
   }
   function handleDeleteProfile(id) {
     setProfiles(deleteProfile(id));
+  }
+
+  // No confirmation dialog -- the user gets Undo instead, which is meant
+  // to happen immediately after a misclick, not behind an extra prompt.
+  function handleRemoveAll() {
+    preClearSnapshotRef.current = groups;
+    apply(() => structuredClone(EMPTY_GROUPS));
+    const notificationId = "rail-remove-all-undo";
+    notifications.show({
+      id: notificationId,
+      color: "flag",
+      autoClose: 8000,
+      message: (
+        <Group justify="space-between" gap={12} wrap="nowrap">
+          <Text size="sm">{t("rail.removedAllNotice")}</Text>
+          <button className="pp-link-btn" onClick={() => handleUndoRemoveAll(notificationId)}>
+            {t("rail.undo")}
+          </button>
+        </Group>
+      ),
+    });
+  }
+  function handleUndoRemoveAll(notificationId) {
+    const snapshot = preClearSnapshotRef.current;
+    if (!snapshot) return;
+    apply(() => snapshot);
+    preClearSnapshotRef.current = null;
+    notifications.hide(notificationId);
   }
 
   function onChipDragStart(e, group, value) {
@@ -234,6 +266,11 @@ export default function Rail({ showSuggested, onCollapse }) {
           <button className="pp-link-btn" onClick={exportToml}>
             {t("rail.exportToml")}
           </button>
+          {count > 0 && (
+            <button className="pp-link-btn" onClick={handleRemoveAll}>
+              {t("rail.removeAll")}
+            </button>
+          )}
         </Group>
       </div>
 
