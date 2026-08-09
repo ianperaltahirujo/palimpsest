@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format follows
 does not yet promise strict [Semantic Versioning](https://semver.org/)
 compatibility guarantees (pre-1.0).
 
+## [0.2.1] — 2026-08-09
+
+### Fixed
+
+- The README's images and every cross-file link (`LICENSE`, `NOTICE`,
+  `CONTRIBUTING.md`, the `docs/design/` postmortems, etc.) rendered
+  broken on PyPI's project page — PyPI's readme renderer has no GitHub
+  base URL to resolve a relative path against, unlike GitHub's own
+  renderer. Every non-anchor link/image now points at an absolute
+  `github.com`/`raw.githubusercontent.com` URL instead.
+
 ## [0.2.0] — 2026-08-09
 
 The 0.1.0 release was the library and CLI alone. This release adds a
@@ -81,5 +92,6 @@ Initial extraction from a private client pipeline: the CLI and library
 matching, honest translation cache with per-entry status), with no
 server or web UI yet.
 
+[0.2.1]: https://github.com/ianperaltahirujo/palimpsest/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ianperaltahirujo/palimpsest/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ianperaltahirujo/palimpsest/releases/tag/v0.1.0

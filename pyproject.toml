@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "palimpsest-translate"
-version = "0.2.0"
+version = "0.2.1"
 description = "Layout-preserving document translation: same pages, same artwork, same typography -- only the words change."
 readme = "README.md"
 license = "Apache-2.0"
