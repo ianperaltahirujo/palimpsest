@@ -210,6 +210,19 @@ class JobRegistry:
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)
 
+    def active_count_for(self, visitor_id: str) -> int:
+        """How many of `visitor_id`'s own jobs are still `queued`/
+        `running` -- used by `routes.py::create_job` to cap how many a
+        single visitor can have in flight at once (see
+        `config.model.LimitsConfig.max_concurrent_jobs_per_visitor`).
+        Jobs already run one at a time process-wide regardless, so this
+        only stops one visitor from queueing many ahead of everyone
+        else, not a real concurrency limit."""
+        return sum(
+            1 for j in self._jobs.values()
+            if j.visitor_id == visitor_id and j.status in ("queued", "running")
+        )
+
     def submit(
         self,
         job: Job,

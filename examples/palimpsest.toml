@@ -97,6 +97,14 @@ extra_dirs = []
 [fonts.per_document]
 # "Some Folder/deed.pdf" = "Georgia"
 
+[limits]
+# Server-only (`palimpsest serve`) -- ignored by `palimpsest translate`.
+# Only matters if the server is reachable by more than one visitor; see
+# SECURITY.md. Neither value is a real rate limiter, just a blunt guardrail
+# against one visitor monopolizing a shared host's compute.
+max_upload_bytes = 52428800          # 50 MB
+max_concurrent_jobs_per_visitor = 1
+
 # Note: there is no [copy_as_is] section here. Which directories/files get
 # copied through untranslated is corpus-specific -- as disclosive as the
 # document map itself -- so it lives in the private documents file (see

@@ -134,6 +134,30 @@ class ThresholdsConfig:
 
 
 @dataclass(frozen=True)
+class LimitsConfig:
+    """Abuse guardrails for the SERVER, not the CLI -- a local `palimpsest
+    translate` invocation has no need for either of these (the operator
+    already controls what they feed it). They matter once a server
+    process is reachable by more than one visitor (see server/app.py's
+    module docstring): the visitor's own API key already bounds per-
+    request cost to whoever's key it is, but compute (OCR, disk) is
+    still paid for by the host regardless of whose key is attached."""
+
+    max_upload_bytes: int = 50 * 1024 * 1024
+    """Mirrors `server.uploads.MAX_UPLOAD_BYTES`'s default -- that
+    module-level constant remains the hardcoded fallback for any caller
+    that doesn't thread a `Config` through (e.g. existing unit tests
+    exercising `validate_and_save` directly); the server route reads
+    this field instead so it's overridable via `[limits]` without a code
+    change."""
+    max_concurrent_jobs_per_visitor: int = 1
+    """Jobs already run one at a time process-wide (one
+    `ThreadPoolExecutor(max_workers=1)`, `server/jobs.py`) -- this only
+    stops one visitor from QUEUEING many at once ahead of everyone
+    else."""
+
+
+@dataclass(frozen=True)
 class FontsConfig:
     scan_default: str = "Calibri"
     extra_dirs: tuple[Path, ...] = ()
@@ -191,3 +215,4 @@ class Config:
     ocr: OcrConfig = field(default_factory=OcrConfig)
     thresholds: ThresholdsConfig = field(default_factory=ThresholdsConfig)
     fonts: FontsConfig = field(default_factory=FontsConfig)
+    limits: LimitsConfig = field(default_factory=LimitsConfig)

@@ -114,3 +114,12 @@ points, not universal constants** — see
 [`docs/design/bold-calibration.md`](design/bold-calibration.md) for how
 the bold threshold specifically was derived, and re-fit your own if your
 documents behave differently.
+
+## Limits (server only)
+
+`[limits]` only matters if you're running `palimpsest serve` somewhere reachable by more than one
+visitor (see `SECURITY.md`) — a plain local `palimpsest translate` invocation ignores it entirely.
+`max_upload_bytes` (default 50 MB) caps a single upload; `max_concurrent_jobs_per_visitor` (default
+1) caps how many jobs one visitor can have queued/running at once. Neither is a real rate limiter —
+they're small, deliberately blunt guardrails against one visitor accidentally (or carelessly)
+monopolizing a shared host's compute, not a defense against a determined adversary.

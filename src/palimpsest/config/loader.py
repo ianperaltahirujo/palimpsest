@@ -25,6 +25,7 @@ from palimpsest.config.model import (
     GlossaryConfig,
     GoogleBackendConfig,
     LanguageConfig,
+    LimitsConfig,
     OcrConfig,
     PathsConfig,
     PostRulesConfig,
@@ -110,6 +111,7 @@ def load(config_path: Path | None) -> Config:
     ocr = data.get("ocr", {})
     thresholds = data.get("thresholds", {})
     fonts = data.get("fonts", {})
+    limits = data.get("limits", {})
 
     default_paths = PathsConfig()
     default_backend_a = AnthropicBackendConfig()
@@ -118,6 +120,7 @@ def load(config_path: Path | None) -> Config:
     default_ocr = OcrConfig()
     default_thresholds = ThresholdsConfig()
     default_fonts = FontsConfig()
+    default_limits = LimitsConfig()
 
     return Config(
         schema=schema,
@@ -206,6 +209,12 @@ def load(config_path: Path | None) -> Config:
                 "use_bundled_fallback", default_fonts.use_bundled_fallback
             ),
             per_document=dict(fonts.get("per_document", {})),
+        ),
+        limits=LimitsConfig(
+            max_upload_bytes=limits.get("max_upload_bytes", default_limits.max_upload_bytes),
+            max_concurrent_jobs_per_visitor=limits.get(
+                "max_concurrent_jobs_per_visitor", default_limits.max_concurrent_jobs_per_visitor
+            ),
         ),
     )
 

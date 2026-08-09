@@ -41,6 +41,20 @@ def test_project_overrides_one_threshold_without_resetting_others(tmp_path):
     assert config.thresholds.min_text_size_scan == 7.0
 
 
+def test_load_none_returns_default_limits():
+    config = loader.load(None)
+    assert config.limits.max_upload_bytes == 50 * 1024 * 1024
+    assert config.limits.max_concurrent_jobs_per_visitor == 1
+
+
+def test_project_overrides_one_limit_without_resetting_the_other(tmp_path):
+    cfg = tmp_path / "palimpsest.toml"
+    cfg.write_text("[limits]\nmax_upload_bytes = 1000\n", encoding="utf-8")
+    config = loader.load(cfg)
+    assert config.limits.max_upload_bytes == 1000
+    assert config.limits.max_concurrent_jobs_per_visitor == 1
+
+
 def test_relative_paths_resolve_against_config_file_directory(tmp_path):
     project_dir = tmp_path / "myproject"
     project_dir.mkdir()

@@ -77,12 +77,22 @@ def _safe_name(name: str) -> str:
 
 
 def validate_and_save(
-    raw_name: str, content: bytes, uploads_dir: Path, visitor_id: str = "local"
+    raw_name: str,
+    content: bytes,
+    uploads_dir: Path,
+    visitor_id: str = "local",
+    max_bytes: int = MAX_UPLOAD_BYTES,
 ) -> UploadedFile:
     """Validate `content` against `raw_name`'s extension and save it
     under a fresh `file_id` directory inside `uploads_dir`. Raises
     `UploadRejected` (never a bare exception) for anything invalid --
-    callers turn that into an HTTP 400 with the message as-is."""
+    callers turn that into an HTTP 400 with the message as-is.
+
+    `max_bytes` defaults to the module constant so every existing caller
+    (including every test in `test_server_uploads.py`) is unaffected --
+    the server route passes `config.limits.max_upload_bytes` instead,
+    which makes the cap overridable via `[limits]` without a code
+    change (see `config.model.LimitsConfig`)."""
     name = _safe_name(raw_name)
     ext = Path(name).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
@@ -92,9 +102,9 @@ def validate_and_save(
 
     if len(content) == 0:
         raise UploadRejected("empty file")
-    if len(content) > MAX_UPLOAD_BYTES:
+    if len(content) > max_bytes:
         raise UploadRejected(
-            f"file too large ({len(content):,} bytes; max {MAX_UPLOAD_BYTES:,})"
+            f"file too large ({len(content):,} bytes; max {max_bytes:,})"
         )
 
     magics = _MAGIC_BY_EXT[ext]

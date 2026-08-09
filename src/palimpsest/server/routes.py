@@ -180,6 +180,7 @@ async def upload(request: Request, file: UploadFile) -> UploadResponse:
         uploaded = validate_and_save(
             file.filename or "upload", content, state.uploads_dir,
             visitor_id=_visitor_id(request),
+            max_bytes=state.config.limits.max_upload_bytes,
         )
     except UploadRejected as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -293,6 +294,16 @@ def create_job(request: Request, body: CreateJobRequest) -> CreateJobResponse:
         uploaded.append(u)
     if not uploaded:
         raise HTTPException(status_code=400, detail="file_ids is empty")
+
+    max_concurrent = state.config.limits.max_concurrent_jobs_per_visitor
+    if state.jobs.active_count_for(visitor_id) >= max_concurrent:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"you already have {max_concurrent} job(s) in progress -- "
+                "wait for one to finish"
+            ),
+        )
 
     config = state.config
     if body.backend and body.backend != config.backend.name:

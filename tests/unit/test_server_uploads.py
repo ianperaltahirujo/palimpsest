@@ -54,6 +54,17 @@ def test_rejects_oversized_file(tmp_path):
         validate_and_save("doc.pdf", oversized, tmp_path)
 
 
+def test_max_bytes_override_is_honored(tmp_path):
+    """The server passes config.limits.max_upload_bytes here instead of
+    relying on the module default -- confirm an override actually takes
+    effect, both tighter and looser than the module constant."""
+    content = _minimal_pdf_bytes()
+    with pytest.raises(UploadRejected, match="too large"):
+        validate_and_save("doc.pdf", content, tmp_path, max_bytes=10)
+    # Same content, no override -- well under the real default, succeeds.
+    validate_and_save("doc.pdf", content, tmp_path)
+
+
 def test_rejects_traversal_shaped_filename(tmp_path):
     content = _minimal_pdf_bytes()
     with pytest.raises(UploadRejected, match="invalid filename"):

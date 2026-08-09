@@ -278,6 +278,23 @@ def test_upload_rejects_traversal_filename(client):
     assert resp.status_code == 400
 
 
+def test_upload_honors_configured_max_upload_bytes(tmp_path):
+    from palimpsest.config.model import LimitsConfig
+
+    config = _config(tmp_path)
+    config = Config(
+        paths=config.paths, thresholds=config.thresholds, fonts=config.fonts,
+        limits=LimitsConfig(max_upload_bytes=100),
+    )
+    app = create_app(config, backend_factory=_fake_backend_factory)
+    with TestClient(app) as c:
+        resp = c.post(
+            "/api/uploads", files={"file": ("doc.pdf", _pdf_bytes(), "application/pdf")}
+        )
+    assert resp.status_code == 400
+    assert "too large" in resp.json()["detail"]
+
+
 # -- estimate ------------------------------------------------------------
 
 
@@ -307,6 +324,39 @@ def test_job_unknown_file_id_404(client):
 def test_job_empty_file_ids_400(client):
     resp = client.post("/api/jobs", json={"file_ids": []})
     assert resp.status_code == 400
+
+
+def test_second_job_from_same_visitor_is_429_while_the_first_is_in_flight(tmp_path):
+    """The one-job-per-visitor guardrail (config.limits.
+    max_concurrent_jobs_per_visitor, default 1): a visitor who already
+    has a queued/running job gets a clean 429 on a second POST /api/jobs,
+    rather than queueing behind it silently. Uses a slow FakeBackend so
+    the first job is still "running" when the second request lands --
+    the (fast, synthetic-PDF) default `client` fixture's jobs finish too
+    quickly for that to be reliably true."""
+
+    def _slow_backend_factory(_config, **_kwargs):
+        return FakeBackend(
+            translate_fn=lambda s: (time.sleep(0.3), s.upper())[1],
+            uses_placeholder_protection=False,
+        )
+
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_slow_backend_factory)
+    with TestClient(app) as c:
+        uploaded = _upload(c)
+        first = c.post("/api/jobs", json={"file_ids": [uploaded["file_id"]]})
+        assert first.status_code == 200
+
+        second_upload = _upload(c)
+        second = c.post("/api/jobs", json={"file_ids": [second_upload["file_id"]]})
+        assert second.status_code == 429
+
+        _wait_for_job(c, first.json()["job_id"])
+        # Once the first has finished, a new one is allowed again.
+        third_upload = _upload(c)
+        third = c.post("/api/jobs", json={"file_ids": [third_upload["file_id"]]})
+        assert third.status_code == 200
 
 
 def test_full_job_lifecycle_translates_and_downloads(client):

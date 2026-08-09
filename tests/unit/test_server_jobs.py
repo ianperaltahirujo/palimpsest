@@ -67,3 +67,43 @@ def test_malformed_job_record_is_skipped_not_fatal(tmp_path):
     registry = JobRegistry(jobs_dir)
     assert registry.get("bad") is None
     assert registry.get("incomplete") is None
+
+
+# -- active_count_for: the one-job-per-visitor guardrail --------------------
+
+
+def test_active_count_for_counts_only_queued_and_running(tmp_path):
+    registry = JobRegistry(tmp_path / "jobs")
+    a1 = registry.create(
+        [_uploaded_file(tmp_path, file_id="f1")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    registry.create(
+        [_uploaded_file(tmp_path, file_id="f2")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    done = registry.create(
+        [_uploaded_file(tmp_path, file_id="f3")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    done.status = "done"
+
+    assert registry.active_count_for("visitor-a") == 2  # a1 and the second, both "queued"
+    assert registry.active_count_for("visitor-b") == 0
+    a1.status = "failed"
+    assert registry.active_count_for("visitor-a") == 1
+
+
+def test_active_count_for_is_scoped_per_visitor(tmp_path):
+    registry = JobRegistry(tmp_path / "jobs")
+    registry.create(
+        [_uploaded_file(tmp_path, file_id="f1")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    registry.create(
+        [_uploaded_file(tmp_path, file_id="f2")], backend_name="google", dual=False,
+        visitor_id="visitor-b",
+    )
+    assert registry.active_count_for("visitor-a") == 1
+    assert registry.active_count_for("visitor-b") == 1
+    assert registry.active_count_for("local") == 0
