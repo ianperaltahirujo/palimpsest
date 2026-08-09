@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://pypi.org/project/palimpsest-translate/"><img alt="PyPI" src="https://img.shields.io/pypi/v/palimpsest-translate.svg?color=blue"></a>
   <a href="https://github.com/ianperaltahirujo/palimpsest/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ianperaltahirujo/palimpsest/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg">
@@ -52,7 +53,7 @@ pip install palimpsest-translate[ocr]       # + OCR for scanned PDFs (needs Tess
 pip install palimpsest-translate[all]       # everything
 ```
 
-Requires Python 3.11+. Not yet on PyPI — until then, install from a clone:
+Requires Python 3.11+. To work on palimpsest itself, or to install from source:
 
 ```bash
 git clone https://github.com/ianperaltahirujo/palimpsest.git
