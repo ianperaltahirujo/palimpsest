@@ -1,4 +1,4 @@
-import { ActionIcon, Alert, AppShell, Burger, Group, ScrollArea, Tooltip, UnstyledButton } from "@mantine/core";
+import { ActionIcon, Alert, Anchor, AppShell, Burger, Group, ScrollArea, Text, Tooltip, UnstyledButton } from "@mantine/core";
 import { useDisclosure, useLocalStorage } from "@mantine/hooks";
 import { IconAlertTriangle, IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
 import { AppStateProvider, useAppState } from "./state.jsx";
@@ -49,6 +49,7 @@ function Shell() {
     <AppShell
       header={{ height: 58 }}
       navbar={{ width: 296, breakpoint: "md", collapsed: { mobile: !mobileOpen, desktop: desktopCollapsed } }}
+      footer={{ height: 40 }}
       padding={0}
     >
       <AppShell.Header>
@@ -115,6 +116,27 @@ function Shell() {
         )}
         <ScreenComponent />
       </AppShell.Main>
+
+      <AppShell.Footer>
+        <Group h="100%" px={20} justify="center" wrap="wrap" gap={4}>
+          <Text size="11px" ff="monospace" c="dimmed">
+            <Anchor href="https://github.com/ianperaltahirujo/palimpsest" target="_blank" rel="noopener" size="11px" ff="monospace">
+              {t("footer.github")}
+            </Anchor>
+            {" · "}
+            <Anchor href="https://pypi.org/project/palimpsest-translate/" target="_blank" rel="noopener" size="11px" ff="monospace">
+              {t("footer.pypi")}
+            </Anchor>
+            {" · "}
+            <Anchor
+              href="https://github.com/ianperaltahirujo/palimpsest/blob/main/LICENSE"
+              target="_blank" rel="noopener" size="11px" ff="monospace"
+            >
+              {t("footer.license")}
+            </Anchor>
+          </Text>
+        </Group>
+      </AppShell.Footer>
 
       {/* The sidebar's own collapse button is unreachable once it's
           hidden -- this small edge tab is the only way back in, same

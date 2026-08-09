@@ -23,6 +23,10 @@ export const STRINGS = {
     "app.backendUnreachable": "Couldn't reach the server",
     "app.serverUnreachableBody": "No local server is answering at the address in the sidebar. Start one with `{cmd}`.",
 
+    "footer.github": "GitHub ↗",
+    "footer.pypi": "PyPI ↗",
+    "footer.license": "Apache 2.0 ↗",
+
     "theme.toggle": "Toggle color theme",
 
     "lang.switchTo": "Switch to {lang}",
@@ -241,6 +245,10 @@ export const STRINGS = {
     "app.showSidebar": "Mostrar barra lateral",
     "app.backendUnreachable": "No se pudo conectar con el servidor",
     "app.serverUnreachableBody": "Ningún servidor local responde en la dirección de la barra lateral. Inícialo con `{cmd}`.",
+
+    "footer.github": "GitHub ↗",
+    "footer.pypi": "PyPI ↗",
+    "footer.license": "Apache 2.0 ↗",
 
     "theme.toggle": "Cambiar tema de color",
 

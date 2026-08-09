@@ -459,7 +459,7 @@ html[data-mantine-color-scheme="dark"] .pp-regmark .pp-u {
 .pp-dev-switcher {
   position: fixed;
   right: 16px;
-  bottom: 16px;
+  bottom: 56px; /* clears the site footer's 40px height + the original 16px margin */
   z-index: 50;
   font-family: var(--mantine-font-family-monospace);
 }
