@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://ianperaltahirujo.github.io/palimpsest/"><img src="docs/assets/logo.png" width="48" height="48" valign="middle" alt="palimpsest logo — two overlapping page outlines in register"></a>
+  <a href="https://ianperaltahirujo.github.io/palimpsest/"><img src="https://raw.githubusercontent.com/ianperaltahirujo/palimpsest/main/docs/assets/logo.png" width="48" height="48" valign="middle" alt="palimpsest logo — two overlapping page outlines in register"></a>
   palimpsest
 </h1>
 
@@ -12,9 +12,9 @@
 <p align="center">
   <a href="https://pypi.org/project/palimpsest-translate/"><img alt="PyPI" src="https://img.shields.io/pypi/v/palimpsest-translate.svg?color=blue"></a>
   <a href="https://github.com/ianperaltahirujo/palimpsest/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ianperaltahirujo/palimpsest/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg"></a>
+  <a href="https://github.com/ianperaltahirujo/palimpsest/blob/main/LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg">
-  <a href="CONTRIBUTING.md"><img alt="No network calls in tests" src="https://img.shields.io/badge/tests-no%20network%20calls-informational.svg"></a>
+  <a href="https://github.com/ianperaltahirujo/palimpsest/blob/main/CONTRIBUTING.md"><img alt="No network calls in tests" src="https://img.shields.io/badge/tests-no%20network%20calls-informational.svg"></a>
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
 
 <p align="center">
   <a href="https://ianperaltahirujo.github.io/palimpsest/">
-    <img src="docs/assets/demo.gif" width="820" alt="Demo: dropping a document, estimating cost, translating it, and comparing the original against the translated page side by side">
+    <img src="https://raw.githubusercontent.com/ianperaltahirujo/palimpsest/main/docs/assets/demo.gif" width="820" alt="Demo: dropping a document, estimating cost, translating it, and comparing the original against the translated page side by side">
   </a>
 </p>
 
@@ -85,7 +85,7 @@ palimpsest batch --only pdf --jobs 4
 
 See `examples/palimpsest.toml`, `examples/entities.example.toml`, and
 `examples/documents.example.toml` for the file shapes, and
-[`docs/configuration.md`](docs/configuration.md) for the full reference.
+[`docs/configuration.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/docs/configuration.md) for the full reference.
 
 ### Web UI
 
@@ -101,7 +101,7 @@ to bind wider). API keys are read from the environment exactly like the
 CLI, and never stored in a job record or echoed back in a response — you
 can also type one into the page itself instead of a shell (`PUT
 /api/keys`, applied immediately, saved to `.env`). See
-[`web/prototype/README.md`](web/prototype/README.md) for the frontend
+[`web/prototype/README.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/web/prototype/README.md) for the frontend
 itself, including `--dev` mode for working on the UI against a live API
 without rebuilding on every change, its "Standalone" mode for publishing
 a build somewhere other than this server (e.g. GitHub Pages, via
@@ -112,7 +112,7 @@ and only for that preview — translation itself never needs it).
 
 A standalone frontend build's default expectation is that each visitor runs their own
 `palimpsest serve` locally. For a zero-command deployment instead — a visitor opens the page,
-types an API key, and translates — see [`docs/deployment.md`](docs/deployment.md) for running the
+types an API key, and translates — see [`docs/deployment.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/docs/deployment.md) for running the
 backend itself somewhere persistent (a `Dockerfile` and a Render walkthrough), plus what
 per-visitor isolation that requires and doesn't guarantee.
 
@@ -143,7 +143,7 @@ almost every design decision here:
 - **Protected entities as a first-class concept**, not a glossary
   workaround — company names, personal names, and amounts are guaranteed
   to survive verbatim, including the specific failure modes documented in
-  [`docs/design/protected-entities.md`](docs/design/protected-entities.md):
+  [`docs/design/protected-entities.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/docs/design/protected-entities.md):
   OCR fragmenting a heading into a bare `GRUPO` and letting it
   machine-translate as if it were an ordinary noun.
 
@@ -151,22 +151,22 @@ The four documents in `docs/design/` are a genuine engineering postmortem
 — what broke, why, and what specifically fixed it — carried over (and
 de-identified) from the pipeline this project was extracted from:
 
-- [`v1-postmortem.md`](docs/design/v1-postmortem.md) — the first version
+- [`v1-postmortem.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/docs/design/v1-postmortem.md) — the first version
   of this pipeline rebuilt documents from scratch and lost logos, fonts,
   and whole spreadsheet parts; nine concrete bugs and what fixed each one.
-- [`protected-entities.md`](docs/design/protected-entities.md) — a company
+- [`protected-entities.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/docs/design/protected-entities.md) — a company
   name translated as if it were a common noun, found after a full corpus
   run had already shipped; two independent root causes and three separate
   places a protective guard got bypassed before the fix became
   architectural instead of another patch.
-- [`bold-calibration.md`](docs/design/bold-calibration.md) — how bold text
+- [`bold-calibration.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/docs/design/bold-calibration.md) — how bold text
   is recovered from scanned pixels when the OCR text layer carries no
   weight information, and why the threshold is a corpus-fitted number, not
   a universal constant.
-- [`limitations.md`](docs/design/limitations.md) — an honest account of
+- [`limitations.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/docs/design/limitations.md) — an honest account of
   what this pipeline does not handle, from a real corpus run rather than
   written speculatively.
-- [`backends.md`](docs/design/backends.md) — why the Gemini/Claude LLM
+- [`backends.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/docs/design/backends.md) — why the Gemini/Claude LLM
   backends handle entity protection completely differently from Google
   Translate's phrase-level API, why Gemini is the default despite Claude
   being the stronger model, and the pricing/quality tradeoffs between all
@@ -213,12 +213,12 @@ project.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). The short version: no test may
+See [`CONTRIBUTING.md`](https://github.com/ianperaltahirujo/palimpsest/blob/main/CONTRIBUTING.md). The short version: no test may
 make a real network call, and `tools/scrub_check.py` runs in CI to keep
 this repository free of the confidential document data it was extracted
 from.
 
 ## License
 
-Apache 2.0 — see [`LICENSE`](LICENSE). See [`NOTICE`](NOTICE) for the
+Apache 2.0 — see [`LICENSE`](https://github.com/ianperaltahirujo/palimpsest/blob/main/LICENSE). See [`NOTICE`](https://github.com/ianperaltahirujo/palimpsest/blob/main/NOTICE) for the
 BabelDOC design-inspiration credit above.
