@@ -1,8 +1,7 @@
-<p align="center">
-  <img src="docs/assets/logo.png" width="88" height="88" alt="palimpsest logo — two overlapping page outlines in register">
-</p>
-
-<h1 align="center">palimpsest</h1>
+<h1 align="center">
+  <img src="docs/assets/logo.png" width="48" height="48" valign="middle" alt="palimpsest logo — two overlapping page outlines in register">
+  palimpsest
+</h1>
 
 <p align="center">
   <i>A palimpsest is a manuscript page scraped clean so the surface can be reused — the<br>
