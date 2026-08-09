@@ -62,9 +62,13 @@ def _upload(client, name="doc.pdf", content=None) -> dict:
 
 
 def _wait_for_job(client, job_id, timeout=10.0) -> dict:
+    return _wait_for_job_with_headers(client, job_id, None, timeout=timeout)
+
+
+def _wait_for_job_with_headers(client, job_id, headers, timeout=10.0) -> dict:
     deadline = time.time() + timeout
     while time.time() < deadline:
-        data = client.get(f"/api/jobs/{job_id}").json()
+        data = client.get(f"/api/jobs/{job_id}", headers=headers).json()
         if data["status"] in ("done", "failed"):
             return data
         time.sleep(0.05)
@@ -349,6 +353,70 @@ def test_download_before_job_finishes_is_404_not_a_crash(client):
 def test_get_job_unknown_id_404(client):
     resp = client.get("/api/jobs/does-not-exist")
     assert resp.status_code == 404
+
+
+# -- ownership: one visitor's uploads/jobs are invisible to another --------
+#
+# Part A/B scoped visitor identity and keys; this is the other half --
+# without it, per-visitor KEY isolation alone would still let one
+# visitor read another's uploaded documents or translation results by
+# guessing a file/job id (both are random UUIDs, but "guessing" here
+# really means "the id leaked some other way," e.g. shared over a link).
+# A mismatch must read exactly like an unknown id (404), never 403 --
+# see `_get_owned_job_or_404`'s and `AppState.get_upload`'s docstrings.
+
+_VISITOR_A = {"X-Palimpsest-Visitor": "visitor-a"}
+_VISITOR_B = {"X-Palimpsest-Visitor": "visitor-b"}
+
+
+def test_uploaded_file_is_invisible_to_a_different_visitor(client):
+    uploaded = _upload(client)  # no header -- lands in the local sentinel bucket
+    resp = client.post(
+        "/api/estimate", json={"file_ids": [uploaded["file_id"]]}, headers=_VISITOR_A
+    )
+    assert resp.status_code == 404
+
+
+def test_job_created_by_one_visitor_is_invisible_to_another(client):
+    upload_resp = client.post(
+        "/api/uploads", files={"file": ("doc.pdf", _pdf_bytes(), "application/pdf")},
+        headers=_VISITOR_A,
+    )
+    file_id = upload_resp.json()["file_id"]
+    job_id = client.post(
+        "/api/jobs", json={"file_ids": [file_id]}, headers=_VISITOR_A
+    ).json()["job_id"]
+    _wait_for_job_with_headers(client, job_id, _VISITOR_A)
+
+    # Visitor A's own file_id doesn't even resolve for visitor B -- can't
+    # create a job with it at all.
+    assert client.post(
+        "/api/jobs", json={"file_ids": [file_id]}, headers=_VISITOR_B
+    ).status_code == 404
+
+    for resp in (
+        client.get(f"/api/jobs/{job_id}", headers=_VISITOR_B),
+        client.get(f"/api/jobs/{job_id}/download/replica", headers=_VISITOR_B),
+        client.get(f"/api/jobs/{job_id}/pages/0.png", headers=_VISITOR_B),
+        client.get(f"/api/jobs/{job_id}/layout", headers=_VISITOR_B),
+    ):
+        assert resp.status_code == 404, resp.request.url
+
+    # Visitor A still has full access to their own job throughout.
+    assert client.get(f"/api/jobs/{job_id}", headers=_VISITOR_A).status_code == 200
+
+
+def test_local_sentinel_jobs_still_work_with_no_header_at_all(client):
+    """The classic single-user desktop workflow (no visitor header
+    anywhere) must be completely unaffected by ownership scoping --
+    this is the same lifecycle test as
+    test_full_job_lifecycle_translates_and_downloads, just confirming
+    ownership doesn't somehow interfere with the no-header path."""
+    uploaded = _upload(client)
+    job_id = client.post("/api/jobs", json={"file_ids": [uploaded["file_id"]]}).json()["job_id"]
+    job = _wait_for_job(client, job_id)
+    assert job["status"] == "done"
+    assert client.get(f"/api/jobs/{job_id}/download/replica").status_code == 200
 
 
 # -- SSE progress ------------------------------------------------------

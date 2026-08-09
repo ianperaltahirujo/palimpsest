@@ -177,7 +177,10 @@ async def upload(request: Request, file: UploadFile) -> UploadResponse:
     state = _state(request)
     content = await file.read()
     try:
-        uploaded = validate_and_save(file.filename or "upload", content, state.uploads_dir)
+        uploaded = validate_and_save(
+            file.filename or "upload", content, state.uploads_dir,
+            visitor_id=_visitor_id(request),
+        )
     except UploadRejected as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     state.remember_upload(uploaded)
@@ -223,6 +226,7 @@ def _backend_for_visitor(state, request: Request, config=None):
 @router.post("/estimate", response_model=list[DocumentEstimateResponse])
 def estimate(request: Request, body: EstimateRequest) -> list[DocumentEstimateResponse]:
     state = _state(request)
+    visitor_id = _visitor_id(request)
     backend = _backend_for_visitor(state, request)
     ctx = TranslationContext(
         source_lang=state.config.language.source, target_lang=state.config.language.target,
@@ -230,7 +234,7 @@ def estimate(request: Request, body: EstimateRequest) -> list[DocumentEstimateRe
     )
     results = []
     for file_id in body.file_ids:
-        uploaded = state.get_upload(file_id)
+        uploaded = state.get_upload(file_id, visitor_id)
         if uploaded is None:
             raise HTTPException(status_code=404, detail=f"unknown file_id {file_id!r}")
 
@@ -280,9 +284,10 @@ def estimate(request: Request, body: EstimateRequest) -> list[DocumentEstimateRe
 @router.post("/jobs", response_model=CreateJobResponse)
 def create_job(request: Request, body: CreateJobRequest) -> CreateJobResponse:
     state = _state(request)
+    visitor_id = _visitor_id(request)
     uploaded = []
     for file_id in body.file_ids:
-        u = state.get_upload(file_id)
+        u = state.get_upload(file_id, visitor_id)
         if u is None:
             raise HTTPException(status_code=404, detail=f"unknown file_id {file_id!r}")
         uploaded.append(u)
@@ -296,7 +301,9 @@ def create_job(request: Request, body: CreateJobRequest) -> CreateJobResponse:
         )
     backend = _backend_for_visitor(state, request, config)
 
-    job = state.jobs.create(uploaded, backend_name=backend.name, dual=body.dual)
+    job = state.jobs.create(
+        uploaded, backend_name=backend.name, dual=body.dual, visitor_id=visitor_id
+    )
     uploaded_by_id = {u.file_id: u for u in uploaded}
     out_dir = state.jobs.jobs_dir / job.id
     state.jobs.submit(
@@ -313,9 +320,22 @@ def _get_job_or_404(state, job_id: str) -> Job:
     return job
 
 
+def _get_owned_job_or_404(state, request: Request, job_id: str) -> Job:
+    """Every job-scoped route in this file uses this instead of
+    `_get_job_or_404` directly. A job id that exists but belongs to a
+    DIFFERENT visitor gets the exact same 404 as one that doesn't exist
+    at all -- never a 403, which would confirm to a guesser that the id
+    is real, just not theirs (see `AppState.get_upload`'s identical
+    reasoning)."""
+    job = _get_job_or_404(state, job_id)
+    if job.visitor_id != _visitor_id(request):
+        raise HTTPException(status_code=404, detail=f"unknown job {job_id!r}")
+    return job
+
+
 @router.get("/jobs/{job_id}", response_model=JobResponse)
 def get_job(request: Request, job_id: str) -> JobResponse:
-    job = _get_job_or_404(_state(request), job_id)
+    job = _get_owned_job_or_404(_state(request), request, job_id)
     return JobResponse(**job.to_dict())
 
 
@@ -326,7 +346,7 @@ def _sse(data: dict) -> bytes:
 @router.get("/jobs/{job_id}/events")
 async def job_events(request: Request, job_id: str) -> StreamingResponse:
     state = _state(request)
-    job = _get_job_or_404(state, job_id)
+    job = _get_owned_job_or_404(state, request, job_id)
 
     async def stream():
         loop = asyncio.get_event_loop()
@@ -368,7 +388,7 @@ def download(
     request: Request, job_id: str, artifact: str, file: str | None = Query(None)
 ) -> StreamingResponse:
     state = _state(request)
-    job = _get_job_or_404(state, job_id)
+    job = _get_owned_job_or_404(state, request, job_id)
     jf = _job_file_or_404(job, file)
 
     if artifact == "report":
@@ -399,11 +419,11 @@ def page_png(
     side: str = Query("output"), file: str | None = Query(None), dpi: int = Query(DEFAULT_PAGE_DPI),
 ) -> StreamingResponse:
     state = _state(request)
-    job = _get_job_or_404(state, job_id)
+    job = _get_owned_job_or_404(state, request, job_id)
     jf = _job_file_or_404(job, file)
 
     if side == "source":
-        uploaded = state.get_upload(jf.file_id)
+        uploaded = state.get_upload(jf.file_id, _visitor_id(request))
         path = uploaded.path if uploaded else None
     elif side == "output":
         path = jf.output_path
@@ -472,7 +492,7 @@ def get_layout(
     request: Request, job_id: str, file: str | None = Query(None), page: int = Query(0)
 ) -> dict:
     state = _state(request)
-    job = _get_job_or_404(state, job_id)
+    job = _get_owned_job_or_404(state, request, job_id)
     jf = _job_file_or_404(job, file)
     if jf.kind == "office":
         raise HTTPException(status_code=400, detail="edit mode is not available for Office files")
@@ -494,7 +514,7 @@ def patch_layout(
     shape) rather than a query parameter, so the existing frontend call
     needs no changes to get real reflow."""
     state = _state(request)
-    job = _get_job_or_404(state, job_id)
+    job = _get_owned_job_or_404(state, request, job_id)
     jf = _job_file_or_404(job, file)
     if jf.kind == "office":
         raise HTTPException(status_code=400, detail="edit mode is not available for Office files")

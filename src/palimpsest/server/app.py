@@ -120,9 +120,16 @@ class AppState:
         with self._lock:
             self._uploaded[uploaded.file_id] = uploaded
 
-    def get_upload(self, file_id: str) -> UploadedFile | None:
+    def get_upload(self, file_id: str, visitor_id: str) -> UploadedFile | None:
+        """`None` both when `file_id` is unknown AND when it belongs to a
+        DIFFERENT visitor -- callers must not distinguish the two (see
+        `routes.py`'s 404-not-403 reasoning), which is exactly why this
+        one check lives here rather than at each call site."""
         with self._lock:
-            return self._uploaded.get(file_id)
+            uploaded = self._uploaded.get(file_id)
+        if uploaded is None or uploaded.visitor_id != visitor_id:
+            return None
+        return uploaded
 
     def get_keys(self, visitor_id: str) -> dict[str, str]:
         with self._lock:

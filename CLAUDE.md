@@ -162,9 +162,16 @@ who didn't supply one).
 None of this adds full multi-tenancy on its own: there is still no per-request auth (a visitor id is self-reported),
 and one shared job queue (`ThreadPoolExecutor(max_workers=1)`, below) serializes every visitor's jobs regardless of
 whose key is attached to which — a standalone frontend build widens WHERE the browser can be and WHOSE key gets
-used, not a guarantee against a determined adversary. Per-visitor KEY scoping alone does not stop one visitor from
-reading another's uploaded documents or translation results by guessing a job/file id — that's a separate
-ownership check on top of the same visitor id, layered onto every job-scoped route.
+used, not a guarantee against a determined adversary.
+
+Upload/job OWNERSHIP is a separate mechanism layered on the same visitor id: `uploads.UploadedFile`/`jobs.Job` both
+carry a `visitor_id` (set at upload/job-creation time from `_visitor_id(request)`), and `AppState.get_upload`/
+`routes.py::_get_owned_job_or_404` (wrapping the pre-existing `_get_job_or_404` at every job-scoped route — `GET`/
+`PATCH /layout`, `download`, `pages/{n}.png`, the SSE `events` route, `GET /jobs/{id}` itself) refuse a mismatched
+visitor id with the SAME 404 an unknown id gets, never a 403 — a real ownership mismatch must not confirm "this id
+exists, just not yours" to whoever's guessing. Without this, per-visitor KEY scoping alone would still let one
+visitor read another's uploaded documents or translation results by guessing a file/job id (both are random
+UUIDs, but "guessing" here really means the id leaked some other way — e.g. shared over a link).
 
 Jobs run on one `ThreadPoolExecutor(max_workers=1)` per server process (`server/jobs.py`) — deliberate, not a
 missing optimization; a local single-user tool has no reason to translate concurrently. `JobRegistry` persists each

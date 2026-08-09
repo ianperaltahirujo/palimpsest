@@ -104,6 +104,14 @@ class Job:
     status: JobStatus = "queued"
     created_at: float = field(default_factory=time.time)
     error: str | None = None
+    visitor_id: str = "local"
+    """Which browser-generated visitor created this job (see
+    `server/routes.py::_visitor_id`) -- `"local"` matches that module's
+    `_LOCAL_VISITOR` sentinel exactly (see `uploads.UploadedFile.visitor_id`
+    for why this is a duplicated literal, not an import). Not exposed via
+    `to_dict()` (nothing in the browser needs to see it -- ownership is
+    enforced server-side, before a `Job` ever reaches a response), but
+    IS included in `_persist_dict()` so it survives a server restart."""
     _queue: queue.Queue = field(default_factory=queue.Queue, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -127,6 +135,7 @@ class Job:
                 "dual": self.dual,
                 "created_at": self.created_at,
                 "error": self.error,
+                "visitor_id": self.visitor_id,
                 "files": [f._persist_dict() for f in self.files],
             }
 
@@ -166,6 +175,7 @@ class JobRegistry:
                 id=data["id"], files=files, backend_name=data["backend"],
                 dual=data.get("dual", False), status=data["status"],
                 created_at=data.get("created_at", time.time()), error=data.get("error"),
+                visitor_id=data.get("visitor_id", "local"),
             )
         except (KeyError, TypeError):
             log.warning("skipping malformed persisted job record: %r", data, exc_info=True)
@@ -186,11 +196,13 @@ class JobRegistry:
         return job
 
     def create(
-        self, uploaded: list[UploadedFile], backend_name: str, dual: bool
+        self, uploaded: list[UploadedFile], backend_name: str, dual: bool, visitor_id: str = "local"
     ) -> Job:
         job_id = uuid.uuid4().hex
         files = [JobFile(file_id=u.file_id, name=u.name, kind=str(u.kind)) for u in uploaded]
-        job = Job(id=job_id, files=files, backend_name=backend_name, dual=dual)
+        job = Job(
+            id=job_id, files=files, backend_name=backend_name, dual=dual, visitor_id=visitor_id
+        )
         self._jobs[job_id] = job
         self._persist(job)
         return job

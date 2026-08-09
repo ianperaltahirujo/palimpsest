@@ -52,6 +52,14 @@ class UploadedFile:
     """A PDF `Kind`, or the literal string "office" for anything else."""
     pages: int | None
     size: int
+    visitor_id: str = "local"
+    """Which browser-generated visitor uploaded this (see
+    `server/routes.py::_visitor_id`) -- `"local"` matches that module's
+    `_LOCAL_VISITOR` sentinel exactly (duplicated as a literal here, not
+    imported, since `uploads.py` is a layer below `routes.py` and must
+    not import back up from it). `AppState.get_upload` (`app.py`) uses
+    this to refuse any request for a file id that doesn't belong to the
+    requesting visitor."""
 
 
 def _safe_name(name: str) -> str:
@@ -69,7 +77,7 @@ def _safe_name(name: str) -> str:
 
 
 def validate_and_save(
-    raw_name: str, content: bytes, uploads_dir: Path
+    raw_name: str, content: bytes, uploads_dir: Path, visitor_id: str = "local"
 ) -> UploadedFile:
     """Validate `content` against `raw_name`'s extension and save it
     under a fresh `file_id` directory inside `uploads_dir`. Raises
@@ -122,5 +130,6 @@ def validate_and_save(
         pages = None
 
     return UploadedFile(
-        file_id=file_id, name=name, path=dest_path, kind=kind, pages=pages, size=len(content)
+        file_id=file_id, name=name, path=dest_path, kind=kind, pages=pages, size=len(content),
+        visitor_id=visitor_id,
     )
