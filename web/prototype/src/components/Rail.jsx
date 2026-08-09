@@ -7,6 +7,7 @@ import { PROTECTED_ENTITIES, SUGGESTED_ENTITIES } from "../state.jsx";
 import { useT } from "../i18n.jsx";
 import { MOCK } from "../config.js";
 import * as api from "../api.js";
+import { deleteProfile, getProfiles, saveProfile } from "../profiles.js";
 
 const GROUPS = ["companies", "people", "places", "other"];
 const EMPTY_GROUPS = { companies: [], people: [], places: [], other: [] };
@@ -25,6 +26,13 @@ export default function Rail({ showSuggested, onCollapse }) {
   const [suggested, setSuggested] = useState(() => (MOCK ? SUGGESTED_ENTITIES : []));
   const [draft, setDraft] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
+  // Profiles live in localStorage (see profiles.js's own docstring for
+  // why -- server-side entities are one shared global file, not scoped
+  // per visitor, so saving a profile there would leak across visitors).
+  // Read once at mount and kept in local state, refreshed after every
+  // save/delete -- nothing else in this app writes pp-entity-profiles.
+  const [profiles, setProfiles] = useState(() => getProfiles());
+  const [profileName, setProfileName] = useState("");
   const count = Object.values(groups).reduce((n, g) => n + g.length, 0);
 
   useEffect(() => {
@@ -77,6 +85,20 @@ export default function Rail({ showSuggested, onCollapse }) {
     a.href = URL.createObjectURL(blob);
     a.download = "entities.toml";
     a.click();
+  }
+
+  function handleSaveProfile() {
+    const name = profileName.trim();
+    if (!name) return;
+    setProfiles(saveProfile(name, groups));
+    setProfileName("");
+    notifications.show({ message: t("rail.profileSaved", { name }) });
+  }
+  function handleLoadProfile(profile) {
+    apply(() => structuredClone(profile.groups));
+  }
+  function handleDeleteProfile(id) {
+    setProfiles(deleteProfile(id));
   }
 
   function onChipDragStart(e, group, value) {
@@ -211,6 +233,58 @@ export default function Rail({ showSuggested, onCollapse }) {
           </button>
           <button className="pp-link-btn" onClick={exportToml}>
             {t("rail.exportToml")}
+          </button>
+        </Group>
+      </div>
+
+      <div style={{ borderTop: "1px solid var(--pp-rule-soft)", paddingTop: 18, marginTop: 18 }}>
+        <Text size="xs" tt="uppercase" fw={600} c="dimmed" mb={11} ff="monospace" style={{ letterSpacing: ".09em" }}>
+          {t("rail.profiles")}
+        </Text>
+        {profiles.length === 0 ? (
+          <Text size="11px" c="dimmed" fs="italic">
+            {t("rail.noProfiles")}
+          </Text>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {profiles.map((p) => (
+              <Group key={p.id} justify="space-between" gap={6} wrap="nowrap">
+                <button
+                  className="pp-link-btn"
+                  aria-label={t("rail.loadProfile", { name: p.name })}
+                  onClick={() => handleLoadProfile(p)}
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {p.name}
+                </button>
+                <button
+                  aria-label={t("rail.deleteProfile", { name: p.name })}
+                  onClick={() => handleDeleteProfile(p.id)}
+                >
+                  ×
+                </button>
+              </Group>
+            ))}
+          </div>
+        )}
+        <Group gap={6} mt={10} wrap="nowrap">
+          <TextInput
+            size="xs"
+            style={{ flex: 1 }}
+            placeholder={t("rail.profileNamePlaceholder")}
+            value={profileName}
+            onChange={(e) => setProfileName(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSaveProfile();
+            }}
+          />
+          <button
+            className="pp-btn-mini"
+            aria-label={t("rail.saveProfileAria")}
+            onClick={handleSaveProfile}
+            disabled={count === 0}
+          >
+            {t("rail.saveProfile")}
           </button>
         </Group>
       </div>
