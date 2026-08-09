@@ -296,13 +296,24 @@ def create_job(request: Request, body: CreateJobRequest) -> CreateJobResponse:
         raise HTTPException(status_code=400, detail="file_ids is empty")
 
     max_concurrent = state.config.limits.max_concurrent_jobs_per_visitor
-    if state.jobs.active_count_for(visitor_id) >= max_concurrent:
+    active = state.jobs.active_jobs_for(visitor_id)
+    if len(active) >= max_concurrent:
+        # `detail` is a dict here, not a plain string like everywhere
+        # else in this file -- FastAPI serializes any JSON-serializable
+        # value, and the frontend (api.js's request()) only special-cases
+        # a dict shape, so every other route's plain-string `detail` is
+        # unaffected. `job_id` names the blocking job so the client can
+        # offer to cancel it instead of just waiting (web UI's Estimate
+        # screen).
         raise HTTPException(
             status_code=429,
-            detail=(
-                f"you already have {max_concurrent} job(s) in progress -- "
-                "wait for one to finish"
-            ),
+            detail={
+                "message": (
+                    f"you already have {max_concurrent} job(s) in progress -- "
+                    "wait for one to finish"
+                ),
+                "job_id": active[0].id,
+            },
         )
 
     config = state.config
@@ -348,6 +359,20 @@ def _get_owned_job_or_404(state, request: Request, job_id: str) -> Job:
 def get_job(request: Request, job_id: str) -> JobResponse:
     job = _get_owned_job_or_404(_state(request), request, job_id)
     return JobResponse(**job.to_dict())
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=JobResponse)
+def cancel_job(request: Request, job_id: str) -> JobResponse:
+    """Frees this visitor's job-limit slot -- see `JobRegistry.cancel`'s
+    own docstring for exactly what this does and doesn't interrupt. Uses
+    `_get_owned_job_or_404` first (rather than relying on `cancel`'s own
+    visitor check alone) purely so an unknown/not-owned id gets the same
+    404 every other job route gives it."""
+    state = _state(request)
+    job = _get_owned_job_or_404(state, request, job_id)
+    cancelled = state.jobs.cancel(job.id, _visitor_id(request))
+    assert cancelled is not None  # job existed and was owned, just confirmed above
+    return JobResponse(**cancelled.to_dict())
 
 
 def _sse(data: dict) -> bytes:

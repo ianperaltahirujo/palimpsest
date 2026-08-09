@@ -43,7 +43,7 @@ from palimpsest.translate.backend import Backend
 
 log = logging.getLogger(__name__)
 
-JobStatus = Literal["queued", "running", "done", "failed"]
+JobStatus = Literal["queued", "running", "done", "failed", "cancelled"]
 FileStatus = Literal["pending", "running", "done", "failed"]
 
 
@@ -223,6 +223,35 @@ class JobRegistry:
             if j.visitor_id == visitor_id and j.status in ("queued", "running")
         )
 
+    def active_jobs_for(self, visitor_id: str) -> list[Job]:
+        """The actual `Job` objects `active_count_for` counts -- used by
+        `routes.py::create_job`'s 429 to name which job is blocking, so
+        the client can offer to cancel it."""
+        return [
+            j for j in self._jobs.values()
+            if j.visitor_id == visitor_id and j.status in ("queued", "running")
+        ]
+
+    def cancel(self, job_id: str, visitor_id: str) -> Job | None:
+        """Frees this visitor's job-limit slot immediately. There is no
+        real interruption available once a file is mid-pipeline (see
+        `_run`'s module-level docstring reasoning and this module's own
+        `_run` guards below) -- a file already running finishes silently
+        in the background with its result discarded, but any file that
+        hasn't started yet is skipped. Returns `None` for an unknown or
+        not-owned job, exactly like `routes.py::_get_owned_job_or_404`'s
+        own 404-not-403 convention (enforced by the caller, not here)."""
+        job = self._jobs.get(job_id)
+        if job is None or job.visitor_id != visitor_id:
+            return None
+        with job._lock:
+            if job.status not in ("queued", "running"):
+                return job
+            job.status = "cancelled"
+            job.error = "cancelled by user"
+        self._persist(job)
+        return job
+
     def submit(
         self,
         job: Job,
@@ -265,10 +294,12 @@ class JobRegistry:
 
         try:
             for index, jf in enumerate(job.files):
-                uploaded = uploaded_by_id[jf.file_id]
                 with job._lock:
+                    if job.status == "cancelled":
+                        break
                     jf.status = "running"
                 self._persist(job)
+                uploaded = uploaded_by_id[jf.file_id]
 
                 def progress(event: ProgressEvent, jf=jf, index=index) -> None:
                     job._queue.put(
@@ -312,12 +343,20 @@ class JobRegistry:
                 self._persist(job)
 
             with job._lock:
-                job.status = "failed" if any(f.status == "failed" for f in job.files) else "done"
+                # A worker thread that was mid-file when `cancel()` set
+                # this to "cancelled" must not clobber that on its way
+                # out -- the file it was running still finished (and its
+                # own status/report above is left as-is), but the JOB's
+                # terminal status is whatever cancel() already decided.
+                if job.status != "cancelled":
+                    any_failed = any(f.status == "failed" for f in job.files)
+                    job.status = "failed" if any_failed else "done"
         except Exception as e:  # noqa: BLE001 -- job-level failure, surfaced to the client
             log.exception("job %s failed", job.id)
             with job._lock:
-                job.status = "failed"
-                job.error = str(e)
+                if job.status != "cancelled":
+                    job.status = "failed"
+                    job.error = str(e)
         finally:
             self._persist(job)
             job._queue.put(None)  # sentinel: SSE stream ends

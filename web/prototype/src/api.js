@@ -7,10 +7,14 @@ import { getVisitorId } from "./visitor.js";
 // callers get one catch shape regardless of which call failed.
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, jobId) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    // Set only for the one route whose `detail` is a dict carrying it
+    // (POST /api/jobs' 429 -- see request()) -- undefined everywhere
+    // else, so `e.jobId` is a safe truthy check for every other caller.
+    this.jobId = jobId;
   }
 }
 
@@ -29,13 +33,23 @@ async function request(path, options = {}) {
   }
   if (!res.ok) {
     let detail = res.statusText;
+    let jobId;
     try {
       const body = await res.json();
-      detail = body.detail || detail;
+      // Every route's `detail` is a plain string except POST /api/jobs'
+      // 429 (server/routes.py::create_job), which sends
+      // {message, job_id} so the caller can offer to cancel the job
+      // that's blocking it (see Estimate.jsx).
+      if (body.detail && typeof body.detail === "object") {
+        detail = body.detail.message || detail;
+        jobId = body.detail.job_id;
+      } else {
+        detail = body.detail || detail;
+      }
     } catch {
       // response wasn't JSON -- keep statusText
     }
-    throw new ApiError(detail, res.status);
+    throw new ApiError(detail, res.status, jobId);
   }
   return res;
 }
@@ -108,6 +122,14 @@ export function createJob(fileIds, { backend, dual = true } = {}) {
 
 export function getJob(jobId) {
   return requestJson(`/api/jobs/${jobId}`);
+}
+
+// Frees the caller's job-limit slot -- see server/jobs.py::JobRegistry.cancel
+// for exactly what this does and doesn't interrupt (a file already
+// mid-translation keeps running in the background; its result is just
+// discarded).
+export function cancelJob(jobId) {
+  return requestJson(`/api/jobs/${jobId}/cancel`, { method: "POST" });
 }
 
 // SSE progress. Returns an unsubscribe function. `onEvent` receives the

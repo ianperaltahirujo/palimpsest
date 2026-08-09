@@ -5,6 +5,7 @@ import { ESTIMATE } from "../state.jsx";
 import { useAppState } from "../state.jsx";
 import { T, useT } from "../i18n.jsx";
 import { MOCK } from "../config.js";
+import * as api from "../api.js";
 
 function Cell({ label, value, sub, valueColor, bar }) {
   return (
@@ -72,6 +73,23 @@ export default function Estimate() {
   const scanCount = MOCK ? 0 : estimates.filter((e) => e.kind === "scan").length;
   const allScans = scanCount > 0 && scanCount === estimates.length;
 
+  // Cancelling the blocking job then immediately retrying is one click
+  // for "get me started on something else" -- the job-limit 429's own
+  // detail carries the id of the job in the way (see api.js's request()
+  // dict-`detail` handling), so there's nothing to look up first.
+  async function handleCancelAndRetry(jobId, notificationId) {
+    try {
+      await api.cancelJob(jobId);
+      notifications.hide(notificationId);
+      await startJob({ dual: true });
+      goto("running", { animate: true });
+    } catch (e) {
+      notifications.update({
+        id: notificationId, message: e.message, color: "flag", autoClose: 8000,
+      });
+    }
+  }
+
   async function handleTranslate() {
     if (MOCK) {
       goto("running", { animate: true });
@@ -81,6 +99,26 @@ export default function Estimate() {
       await startJob({ dual: true });
       goto("running", { animate: true });
     } catch (e) {
+      if (e.status === 429 && e.jobId) {
+        const notificationId = `job-limit-${e.jobId}`;
+        notifications.show({
+          id: notificationId,
+          autoClose: false,
+          color: "flag",
+          message: (
+            <div>
+              <Text size="sm">{e.message}</Text>
+              <Button
+                size="xs" variant="white" color="flag" mt={8}
+                onClick={() => handleCancelAndRetry(e.jobId, notificationId)}
+              >
+                {t("estimate.cancelBlockingJob")}
+              </Button>
+            </div>
+          ),
+        });
+        return;
+      }
       notifications.show({ message: e.message, color: "flag" });
     }
   }

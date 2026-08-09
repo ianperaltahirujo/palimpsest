@@ -359,6 +359,152 @@ def test_second_job_from_same_visitor_is_429_while_the_first_is_in_flight(tmp_pa
         assert third.status_code == 200
 
 
+def test_429_body_names_the_blocking_job(tmp_path):
+    """`create_job`'s 429 `detail` is a dict (`{"message", "job_id"}`),
+    not a plain string like every other route in this file -- the web
+    UI's Cancel-on-the-notification flow (Estimate.jsx) needs the id of
+    the job it would be cancelling."""
+
+    def _slow_backend_factory(_config, **_kwargs):
+        return FakeBackend(
+            translate_fn=lambda s: (time.sleep(0.3), s.upper())[1],
+            uses_placeholder_protection=False,
+        )
+
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_slow_backend_factory)
+    with TestClient(app) as c:
+        uploaded = _upload(c)
+        first = c.post("/api/jobs", json={"file_ids": [uploaded["file_id"]]})
+        first_job_id = first.json()["job_id"]
+
+        second_upload = _upload(c)
+        second = c.post("/api/jobs", json={"file_ids": [second_upload["file_id"]]})
+        assert second.status_code == 429
+        detail = second.json()["detail"]
+        assert detail["job_id"] == first_job_id
+        assert "message" in detail
+
+        _wait_for_job(c, first_job_id)
+
+
+def test_cancel_frees_the_slot_for_a_new_job(tmp_path):
+    """Cancelling the blocking job lets a new one start immediately --
+    no waiting for the cancelled job's already-running file to actually
+    finish (see `JobRegistry.cancel`'s docstring: this frees the QUOTA
+    slot, it doesn't stop in-flight work)."""
+
+    def _slow_backend_factory(_config, **_kwargs):
+        return FakeBackend(
+            translate_fn=lambda s: (time.sleep(2), s.upper())[1],
+            uses_placeholder_protection=False,
+        )
+
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_slow_backend_factory)
+    with TestClient(app) as c:
+        uploaded = _upload(c)
+        first = c.post("/api/jobs", json={"file_ids": [uploaded["file_id"]]})
+        first_job_id = first.json()["job_id"]
+
+        blocked_upload = _upload(c)
+        blocked = c.post("/api/jobs", json={"file_ids": [blocked_upload["file_id"]]})
+        assert blocked.status_code == 429
+
+        cancel_resp = c.post(f"/api/jobs/{first_job_id}/cancel")
+        assert cancel_resp.status_code == 200
+        assert cancel_resp.json()["status"] == "cancelled"
+
+        # Immediately -- the first job's single file is still translating
+        # in the background (2s sleep), but the quota slot is free.
+        third_upload = _upload(c)
+        third = c.post("/api/jobs", json={"file_ids": [third_upload["file_id"]]})
+        assert third.status_code == 200
+
+
+def test_cancel_is_scoped_to_the_owning_visitor(client):
+    upload_resp = client.post(
+        "/api/uploads", files={"file": ("doc.pdf", _pdf_bytes(), "application/pdf")},
+        headers=_VISITOR_A,
+    )
+    file_id = upload_resp.json()["file_id"]
+    job_id = client.post(
+        "/api/jobs", json={"file_ids": [file_id]}, headers=_VISITOR_A
+    ).json()["job_id"]
+
+    assert client.post(f"/api/jobs/{job_id}/cancel", headers=_VISITOR_B).status_code == 404
+    assert client.post(f"/api/jobs/{job_id}/cancel", headers=_VISITOR_A).status_code == 200
+
+
+def test_cancelling_a_multifile_job_skips_files_not_yet_started(tmp_path):
+    """The one real interruption available: a file that hasn't started
+    is never started once the job is cancelled. The file already
+    running is left alone (see `JobRegistry.cancel`'s docstring)."""
+
+    def _slow_backend_factory(_config, **_kwargs):
+        return FakeBackend(
+            translate_fn=lambda s: (time.sleep(1.5), s.upper())[1],
+            uses_placeholder_protection=False,
+        )
+
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_slow_backend_factory)
+    with TestClient(app) as c:
+        first_upload = _upload(c, name="a.pdf")
+        second_upload = _upload(c, name="b.pdf")
+        create_resp = c.post(
+            "/api/jobs", json={"file_ids": [first_upload["file_id"], second_upload["file_id"]]}
+        )
+        job_id = create_resp.json()["job_id"]
+
+        # Give the worker time to start the FIRST file (it processes
+        # files sequentially) before cancelling.
+        time.sleep(0.3)
+        cancel_resp = c.post(f"/api/jobs/{job_id}/cancel")
+        assert cancel_resp.status_code == 200
+
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            job = c.get(f"/api/jobs/{job_id}").json()
+            first_file = next(f for f in job["files"] if f["name"] == "a.pdf")
+            if first_file["status"] in ("done", "failed"):
+                break
+            time.sleep(0.05)
+
+        job = c.get(f"/api/jobs/{job_id}").json()
+        assert job["status"] == "cancelled"
+        second_file = next(f for f in job["files"] if f["name"] == "b.pdf")
+        assert second_file["status"] == "pending"
+
+
+def test_worker_finishing_after_cancel_does_not_overwrite_cancelled_status(tmp_path):
+    """A worker thread mid-file when `cancel()` lands finishes that file
+    normally (nothing can interrupt it), but the JOB's terminal status
+    must stay "cancelled", not get clobbered back to "done"/"failed" by
+    `_run`'s own final status-set."""
+
+    def _slow_backend_factory(_config, **_kwargs):
+        return FakeBackend(
+            translate_fn=lambda s: (time.sleep(0.5), s.upper())[1],
+            uses_placeholder_protection=False,
+        )
+
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_slow_backend_factory)
+    with TestClient(app) as c:
+        uploaded = _upload(c)
+        job_id = c.post("/api/jobs", json={"file_ids": [uploaded["file_id"]]}).json()["job_id"]
+
+        time.sleep(0.1)  # let the worker actually start translating
+        assert c.post(f"/api/jobs/{job_id}/cancel").status_code == 200
+
+        # Wait past when the in-flight file would have finished on its
+        # own -- the job must still read "cancelled", not "done".
+        time.sleep(1.0)
+        job = c.get(f"/api/jobs/{job_id}").json()
+        assert job["status"] == "cancelled"
+
+
 def test_full_job_lifecycle_translates_and_downloads(client):
     uploaded = _upload(client)
     create_resp = client.post("/api/jobs", json={"file_ids": [uploaded["file_id"]], "dual": True})

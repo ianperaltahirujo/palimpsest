@@ -138,6 +138,7 @@ export const STRINGS = {
     "estimate.scanExcludedSingular": "{n} scanned file isn't counted above -- it has no text layer until OCR runs during translation.",
     "estimate.cta": "Translate {n} documents →",
     "estimate.ctaSingular": "Translate {n} document →",
+    "estimate.cancelBlockingJob": "Cancel that job and start this one",
 
     "running.title": "Running",
     "running.phase.classify.name": "Classify",
@@ -345,6 +346,7 @@ export const STRINGS = {
     "estimate.scanExcludedSingular": "{n} archivo escaneado no está incluido arriba -- no tiene capa de texto hasta que el OCR se ejecute durante la traducción.",
     "estimate.cta": "Traducir {n} documentos →",
     "estimate.ctaSingular": "Traducir {n} documento →",
+    "estimate.cancelBlockingJob": "Cancelar ese trabajo y comenzar este",
 
     "running.title": "En proceso",
     "running.phase.classify.name": "Clasificar",

@@ -107,3 +107,67 @@ def test_active_count_for_is_scoped_per_visitor(tmp_path):
     assert registry.active_count_for("visitor-a") == 1
     assert registry.active_count_for("visitor-b") == 1
     assert registry.active_count_for("local") == 0
+
+
+# -- cancel: frees a visitor's quota slot without a real interruption -------
+
+
+def test_active_jobs_for_returns_the_actual_job_objects(tmp_path):
+    registry = JobRegistry(tmp_path / "jobs")
+    a1 = registry.create(
+        [_uploaded_file(tmp_path, file_id="f1")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    done = registry.create(
+        [_uploaded_file(tmp_path, file_id="f2")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    done.status = "done"
+
+    active = registry.active_jobs_for("visitor-a")
+    assert [j.id for j in active] == [a1.id]
+    assert registry.active_jobs_for("visitor-b") == []
+
+
+def test_cancel_sets_status_and_frees_active_count(tmp_path):
+    registry = JobRegistry(tmp_path / "jobs")
+    job = registry.create(
+        [_uploaded_file(tmp_path, file_id="f1")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    assert registry.active_count_for("visitor-a") == 1
+
+    cancelled = registry.cancel(job.id, "visitor-a")
+    assert cancelled is not None
+    assert cancelled.status == "cancelled"
+    assert cancelled.error
+    assert registry.active_count_for("visitor-a") == 0
+
+
+def test_cancel_unknown_job_returns_none(tmp_path):
+    registry = JobRegistry(tmp_path / "jobs")
+    assert registry.cancel("does-not-exist", "visitor-a") is None
+
+
+def test_cancel_wrong_visitor_returns_none(tmp_path):
+    registry = JobRegistry(tmp_path / "jobs")
+    job = registry.create(
+        [_uploaded_file(tmp_path, file_id="f1")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    assert registry.cancel(job.id, "visitor-b") is None
+    # Not cancelled -- the wrong-visitor call must be a complete no-op.
+    assert registry.get(job.id).status == "queued"
+
+
+def test_cancel_an_already_terminal_job_is_a_harmless_no_op(tmp_path):
+    registry = JobRegistry(tmp_path / "jobs")
+    job = registry.create(
+        [_uploaded_file(tmp_path, file_id="f1")], backend_name="google", dual=False,
+        visitor_id="visitor-a",
+    )
+    job.status = "done"
+
+    result = registry.cancel(job.id, "visitor-a")
+    assert result is not None
+    assert result.status == "done"  # left as-is, not overwritten to "cancelled"

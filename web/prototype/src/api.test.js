@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, downloadUrl, estimate, getEntities, getLayout, pageUrl } from "./api.js";
+import { ApiError, cancelJob, downloadUrl, estimate, getEntities, getLayout, pageUrl } from "./api.js";
 
 function mockFetchOnce(response) {
   global.fetch = vi.fn().mockResolvedValue(response);
@@ -75,6 +75,34 @@ describe("HTTP-level failure", () => {
       expect(e.status).toBe(400);
     }
   });
+
+  it("unpacks a dict-shaped `detail` ({message, job_id}) -- POST /api/jobs' 429", async () => {
+    mockFetchOnce(
+      jsonResponse(
+        { detail: { message: "you already have 1 job(s) in progress -- wait for one to finish", job_id: "job-123" } },
+        { ok: false, status: 429, statusText: "Too Many Requests" },
+      ),
+    );
+    try {
+      await getEntities();
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError);
+      expect(e.status).toBe(429);
+      expect(e.message).toBe("you already have 1 job(s) in progress -- wait for one to finish");
+      expect(e.jobId).toBe("job-123");
+    }
+  });
+
+  it("leaves `jobId` undefined for every ordinary string-`detail` error", async () => {
+    mockFetchOnce(jsonResponse({ detail: "unknown job 'nope'" }, { ok: false, status: 404 }));
+    try {
+      await getEntities();
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect(e.jobId).toBeUndefined();
+    }
+  });
 });
 
 describe("non-JSON 200 response (no /api proxy behind the dev server)", () => {
@@ -103,6 +131,14 @@ describe("success path", () => {
     expect(url).toContain("/api/estimate");
     expect(options.method).toBe("POST");
     expect(JSON.parse(options.body)).toEqual({ file_ids: ["a", "b"] });
+  });
+
+  it("cancelJob POSTs to /api/jobs/{id}/cancel with no body", async () => {
+    mockFetchOnce(jsonResponse({ id: "job1", status: "cancelled" }));
+    await cancelJob("job1");
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain("/api/jobs/job1/cancel");
+    expect(options.method).toBe("POST");
   });
 });
 

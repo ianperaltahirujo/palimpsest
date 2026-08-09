@@ -1,12 +1,15 @@
 import { useEffect } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
+import { cleanNotifications, Notifications } from "@mantine/notifications";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api.js", () => ({
   health: vi.fn(),
   uploadFile: vi.fn(),
   estimate: vi.fn(),
+  createJob: vi.fn(),
+  cancelJob: vi.fn(),
 }));
 
 import * as api from "../api.js";
@@ -26,6 +29,11 @@ import Estimate from "./Estimate.jsx";
 // Calling it after `addUploads` resolves would still submit an empty
 // file_ids list. Splitting the trigger on `uploads` itself picks up the
 // closure from the render where `uploads` actually contains the new file.
+function ScreenProbe() {
+  const { screen: current } = useAppState();
+  return <div data-testid="screen-probe">{current}</div>;
+}
+
 function Harness({ files }) {
   const { addUploads, runEstimate, uploads } = useAppState();
   useEffect(() => {
@@ -34,13 +42,19 @@ function Harness({ files }) {
   useEffect(() => {
     if (uploads.length === files.length) runEstimate();
   }, [uploads]); // eslint-disable-line react-hooks/exhaustive-deps
-  return <Estimate />;
+  return (
+    <>
+      <ScreenProbe />
+      <Estimate />
+    </>
+  );
 }
 
 function renderEstimate(files) {
   return render(
     <MantineProvider theme={theme}>
       <I18nProvider>
+        <Notifications />
         <AppStateProvider>
           <Harness files={files} />
         </AppStateProvider>
@@ -63,6 +77,7 @@ const SCAN_ESTIMATE = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  cleanNotifications();
   api.health.mockResolvedValue({
     version: "0", backend: "gemini", anthropic_key_present: false, gemini_key_present: false,
   });
@@ -113,5 +128,33 @@ describe("all files are digital", () => {
     expect(await screen.findByText("12")).toBeInTheDocument(); // the real unit_count, not the pre-load 0
     expect(screen.queryByText(/scanned file/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/every file here is a scan/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("job-limit 429 offers a Cancel-and-retry affordance", () => {
+  it("shows a Cancel button naming the blocking job, and clicking it cancels then retries", async () => {
+    api.uploadFile.mockResolvedValueOnce(DIGITAL_FILE);
+    api.estimate.mockResolvedValue([DIGITAL_ESTIMATE]);
+    const blockingError = Object.assign(new Error("you already have 1 job(s) in progress -- wait for one to finish"), {
+      status: 429, jobId: "blocking-job-1",
+    });
+    api.createJob
+      .mockRejectedValueOnce(blockingError)
+      .mockResolvedValueOnce({ job_id: "new-job-1" });
+    api.cancelJob.mockResolvedValue({ id: "blocking-job-1", status: "cancelled" });
+
+    renderEstimate([DIGITAL_FILE]);
+    await screen.findByText("12"); // grid loaded, Translate is clickable
+
+    fireEvent.click(screen.getByRole("button", { name: /translate 1 document/i }));
+
+    const cancelButton = await screen.findByRole("button", { name: /cancel that job and start this one/i });
+    expect(screen.getByText(/you already have 1 job\(s\) in progress/i)).toBeInTheDocument();
+
+    fireEvent.click(cancelButton);
+
+    await screen.findByText("running", { selector: '[data-testid="screen-probe"]' });
+    expect(api.cancelJob).toHaveBeenCalledWith("blocking-job-1");
+    expect(api.createJob).toHaveBeenCalledTimes(2);
   });
 });
