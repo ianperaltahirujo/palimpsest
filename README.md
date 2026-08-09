@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" width="88" height="88" alt="palimpsest logo — two overlapping page outlines in register">
+  <img src="docs/assets/logo.png" width="88" height="88" alt="palimpsest logo — two overlapping page outlines in register">
 </p>
 
 <h1 align="center">palimpsest</h1>
