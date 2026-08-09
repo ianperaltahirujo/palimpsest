@@ -197,6 +197,7 @@ class AnthropicBackend:
         batch_poll_interval: float = 10.0,
         batch_poll_timeout: float = 3600.0,
         client: Any | None = None,
+        api_key: str | None = None,
     ):
         """`client`, if given, is used as-is instead of constructing a real
         `anthropic.Anthropic()` -- the only way tests exercise this class
@@ -204,7 +205,18 @@ class AnthropicBackend:
         `tests/fixtures/fake_anthropic_client.py`). Typed `Any` rather than
         `anthropic.Anthropic` on purpose: the real contract is duck-typed
         (`.messages.create/count_tokens/batches.*`), which is what lets a
-        lightweight fake stand in for it in tests."""
+        lightweight fake stand in for it in tests.
+
+        `api_key`, if given, is passed straight through to
+        `anthropic.Anthropic(api_key=...)`. Left `None` (the CLI's own
+        usage, and the server's local/single-user path), the SDK falls
+        back to its own resolution chain (`ANTHROPIC_API_KEY`,
+        `ANTHROPIC_AUTH_TOKEN`, an `ant auth login` profile) exactly as
+        before this parameter existed -- passing `None` explicitly is not
+        distinguishable from omitting it. The server (`server/routes.py`)
+        never passes a bare `None` here for a real multi-tenant visitor
+        with no configured key; see `translate.registry._build_one`'s
+        `allow_env_fallback` for where that's actually prevented."""
         if client is None and anthropic is None:
             raise DependencyError(
                 "the 'anthropic' package is required for the Claude backend -- "
@@ -217,23 +229,23 @@ class AnthropicBackend:
         self.max_output_tokens_per_unit = max_output_tokens_per_unit
         self.batch_poll_interval = batch_poll_interval
         self.batch_poll_timeout = batch_poll_timeout
-        # anthropic.Anthropic() resolves ANTHROPIC_API_KEY (or
-        # ANTHROPIC_AUTH_TOKEN / an `ant auth login` profile) from the
-        # environment on its own -- never accept a key from config or
-        # argv here, so it can never end up in a committed TOML file or a
-        # shell history.
         self._client: Any = (
-            client if client is not None else anthropic.Anthropic(max_retries=max_retries)
+            client
+            if client is not None
+            else anthropic.Anthropic(api_key=api_key, max_retries=max_retries)
         )
 
     @classmethod
-    def from_config(cls, cfg: AnthropicBackendConfig) -> AnthropicBackend:
+    def from_config(
+        cls, cfg: AnthropicBackendConfig, *, api_key: str | None = None
+    ) -> AnthropicBackend:
         return cls(
             model=cfg.model,
             effort=cfg.effort,
             batch_size=cfg.batch_size,
             use_batches_api=cfg.use_batches_api,
             max_retries=cfg.max_retries,
+            api_key=api_key,
         )
 
     # -- single unit ------------------------------------------------------

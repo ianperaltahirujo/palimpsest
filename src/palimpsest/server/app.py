@@ -26,25 +26,38 @@ That is only safe because of what else is true:
   `extra_origins`) answers the extra preflight check Chrome requires
   before a public HTTPS origin (like a GitHub Pages URL) may reach a
   loopback target like this server at all.
-- API keys are read from the process environment exactly the way the
-  CLI already does (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`), are never
-  stored in a job record, and are never included in any response body
-  -- `/api/health` reports only whether each is present. They CAN now
-  be accepted over HTTP (`PUT /api/keys`, `routes.py`), which is a
-  deliberate, narrow exception to "never over HTTP," made specifically
-  so a key can be typed into a page instead of a shell: only from a
-  request whose origin already passed `OriginCheckMiddleware` (so only
-  an origin the caller explicitly allowlisted), only applied to this
-  same loopback-bound process's own environment, and written only to
-  a local `.env` this same machine controls -- never proxied, relayed,
-  or logged. A `.env` file, if present, is also loaded into that same
-  environment by `cli.py::main()` before `serve` even starts.
+- API keys are scoped per VISITOR (`routes.py::_visitor_id`/`_resolve_key`,
+  `AppState._keys`), not read unconditionally from the process
+  environment -- a request with no visitor id (curl, scripts, the
+  classic single-user desktop workflow) falls back to one fixed local
+  sentinel (`_LOCAL_VISITOR`), which alone still consults this process's
+  own environment (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) and its local
+  `.env`, exactly as before per-visitor scoping existed. Any OTHER
+  visitor's key lives only in-memory in `AppState._keys`, is never
+  stored in a job record, and is never included in any response body --
+  `/api/health` reports only whether each is present, per visitor. Keys
+  CAN be accepted over HTTP (`PUT /api/keys`, `routes.py`), a deliberate,
+  narrow exception to "never over HTTP," made specifically so a key can
+  be typed into a page instead of a shell -- reachable only from an
+  origin `OriginCheckMiddleware` already allowed. Only the local
+  sentinel's key is ever written to disk (a local `.env`, loaded back by
+  `cli.py::main()` before `serve` even starts); every other visitor's
+  key exists only for the lifetime of the server process and is lost on
+  restart -- there is no persistence story for a hosted deployment's
+  visitor keys, by design (see `translate.registry.make_backend`'s
+  `allow_env_fallback` for the mechanism that keeps a non-local
+  visitor's missing key from ever silently falling back to reading this
+  process's own environment, which would leak the operator's own key).
 
-None of this is adequate for a hosted, multi-user deployment -- there is
-still exactly one active key per running server process, no per-request
-auth, and one shared job queue. It is adequate for what this is: a local
-tool one person runs against their own documents on their own machine,
-optionally driven from a frontend published somewhere else.
+This still isn't full multi-tenancy: there is no per-request auth (a
+visitor id is self-reported, not verified), and one shared job queue
+(`ThreadPoolExecutor(max_workers=1)`, `server/jobs.py`) serializes every
+visitor's jobs regardless of whose key is attached to which. It is
+adequate for what this is: a local tool one person runs against their
+own documents, OR a publicly-hosted instance where per-visitor id scoping
+keeps casual cross-visitor exposure from happening by accident during
+normal use -- not a defense against a determined adversary reusing a
+leaked id.
 """
 
 from __future__ import annotations
@@ -87,12 +100,20 @@ class AppState:
     per-request so repeated submissions in one run always target the
     same file. Falls back to `<cwd>/.env` if none exists yet."""
     jobs: JobRegistry
-    backend_factory: Callable[[Config], Backend] = make_backend
+    backend_factory: Callable[..., Backend] = make_backend
     """Overridable so tests can inject a `FakeBackend` without a real
     network call or API key -- see `create_app`'s `backend_factory`
     parameter. Defaults to the real `translate.registry.make_backend`,
-    exactly what the CLI uses."""
+    exactly what the CLI uses. Called with `anthropic_api_key`/
+    `gemini_api_key`/`allow_env_fallback` kwargs (see
+    `routes.py::_resolve_key`) -- `Callable[..., Backend]` rather than a
+    narrower signature since a test's fake factory only needs to accept
+    (and typically ignores) whichever of those it's given."""
     _uploaded: dict[str, UploadedFile] = field(default_factory=dict)
+    _keys: dict[str, dict[str, str]] = field(default_factory=dict)
+    """visitor_id -> {"ANTHROPIC_API_KEY": ..., "GEMINI_API_KEY": ...}.
+    See `routes.py::_resolve_key`/`_LOCAL_VISITOR` for how this is read
+    and when it falls back to this process's own environment."""
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def remember_upload(self, uploaded: UploadedFile) -> None:
@@ -103,12 +124,20 @@ class AppState:
         with self._lock:
             return self._uploaded.get(file_id)
 
+    def get_keys(self, visitor_id: str) -> dict[str, str]:
+        with self._lock:
+            return dict(self._keys.get(visitor_id, {}))
+
+    def set_key(self, visitor_id: str, env_name: str, value: str) -> None:
+        with self._lock:
+            self._keys.setdefault(visitor_id, {})[env_name] = value
+
     def refresh_entities(self) -> None:
         self.entities = config_loader.load_entities(self.config)
 
 
 def _load_state(
-    config: Config, backend_factory: Callable[[Config], Backend]
+    config: Config, backend_factory: Callable[..., Backend]
 ) -> AppState:
     config.paths.ensure_dirs()
 
@@ -155,7 +184,7 @@ def create_app(
     *,
     static_dir: Path | None = None,
     extra_origins: frozenset[str] = frozenset(),
-    backend_factory: Callable[[Config], Backend] = make_backend,
+    backend_factory: Callable[..., Backend] = make_backend,
 ) -> FastAPI:
     """`static_dir`, if given, is the built SPA (`web/prototype/dist`),
     mounted at `/` so the app is served from the same origin as the API

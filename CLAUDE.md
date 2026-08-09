@@ -127,23 +127,44 @@ this hand-rolled a middleware to bolt the response header on after the fact, whi
 — a real browser evaluating a preflight looks at the status code, not just header presence. Don't reintroduce
 that; use `allow_private_network=True` on `CORSMiddleware` itself.)
 
-API keys are read from the server process's own environment (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`)
-and are never stored in a job record or included in any response body — `GET /api/health` reports only whether
-each is present. They CAN now be accepted over HTTP: `PUT /api/keys` (`routes.py`) sets `os.environ` directly
-(every credential read in this codebase is live per-request, nothing caches a stale value, so this needs no
-changes anywhere else) and persists to a local `.env` via `python-dotenv`'s `set_key()` so it survives a restart.
-This is a deliberate, narrow exception to "keys never travel over HTTP" — not a general loosening — made
-specifically so a key can be typed into a page instead of a shell: reachable only from an origin
-`OriginCheckMiddleware` already allowed, applied only to this same loopback-bound process's own environment, and
-written only to a `.env` file on this same machine. `cli.py::main()` loads that same `.env` file (via
-`python-dotenv`, `override=False` so a real exported var always wins) before dispatching to any subcommand
-including `serve` — a key still never comes from `palimpsest.toml` or argv, and a submitted key is never echoed
-back in a response.
+API keys are scoped per VISITOR, not read unconditionally from the server process's own environment.
+`web/prototype/src/visitor.js` mints a random id per browser, sent as `X-Palimpsest-Visitor` (or a `visitor` query
+param for the handful of requests — SSE, `<img>`/`<a>` URLs — that can't set custom headers); `routes.py`'s
+`_visitor_id()` falls back to one fixed `_LOCAL_VISITOR` sentinel when neither is present (curl, scripts, the
+classic single-user desktop workflow), which is exactly today's implicit single-scope behavior made explicit. This
+is identity, not auth — nothing is signed, nothing stops a client from sending a different id on purpose; it only
+keeps one visitor's browser from accidentally seeing another's keys/uploads/jobs during normal use, not a defense
+against a determined adversary reusing a leaked id.
 
-None of this adds real multi-tenancy: there is still exactly one active key per running server process (setting
-one overwrites it for every subsequent request, not just the caller's own), no per-request auth, and one shared
-job queue (`ThreadPoolExecutor(max_workers=1)`, below) — a standalone frontend build widens WHERE the browser can
-be, not WHO the server trusts once a request passes the origin check.
+Each visitor's key lives in `AppState._keys` (in-memory, per-process, never persisted) and is never stored in a job
+record or included in any response body — `GET /api/health` reports only whether each is present, for the
+requesting visitor. `PUT /api/keys` (`routes.py::put_keys`) accepts a key over HTTP — a deliberate, narrow exception
+to "keys never travel over HTTP," made specifically so a key can be typed into a page instead of a shell, reachable
+only from an origin `OriginCheckMiddleware` already allowed. Only `_LOCAL_VISITOR`'s key ALSO goes to
+`os.environ` and a local `.env` (via `python-dotenv`'s `set_key()`), so it survives a restart exactly as before
+per-visitor scoping existed; `cli.py::main()` still loads that same `.env` before dispatching to any subcommand.
+Every other visitor's key is lost on process restart — there is no persistence story for a hosted deployment's
+visitor keys, by design (see `translate.registry.make_backend`'s `allow_env_fallback` for the deployment note
+below).
+
+**The critical correctness property**: `translate/registry.py::make_backend`/`_build_one`/`_has_credentials` accept
+explicit `anthropic_api_key`/`gemini_api_key`/`allow_env_fallback` params. `anthropic.Anthropic(api_key=None)` and
+`genai.Client(api_key=None)` do NOT mean "no key" to those SDKs — they mean "fall back to `os.environ` yourself,"
+which would hand an unconfigured public visitor whatever key `_LOCAL_VISITOR` (the operator) has set. `routes.py`
+resolves each visitor's key via `_resolve_key()` (per-visitor store first; environment fallback ONLY for
+`_LOCAL_VISITOR`) and passes `allow_env_fallback=False` for every other visitor — `_build_one` then raises a clean
+`DependencyError` (→ HTTP 503) directly, rather than ever constructing an SDK client with a key that could silently
+resolve from this process's own environment. This closes the leak for both the PRIMARY backend and any configured
+FALLBACK backend (`_has_credentials` no longer reads `os.environ` on a non-local visitor's behalf either — an
+unrelated credential sitting in the operator's own environment must never get wired up as a fallback for a visitor
+who didn't supply one).
+
+None of this adds full multi-tenancy on its own: there is still no per-request auth (a visitor id is self-reported),
+and one shared job queue (`ThreadPoolExecutor(max_workers=1)`, below) serializes every visitor's jobs regardless of
+whose key is attached to which — a standalone frontend build widens WHERE the browser can be and WHOSE key gets
+used, not a guarantee against a determined adversary. Per-visitor KEY scoping alone does not stop one visitor from
+reading another's uploaded documents or translation results by guessing a job/file id — that's a separate
+ownership check on top of the same visitor id, layered onto every job-scoped route.
 
 Jobs run on one `ThreadPoolExecutor(max_workers=1)` per server process (`server/jobs.py`) — deliberate, not a
 missing optimization; a local single-user tool has no reason to translate concurrently. `JobRegistry` persists each

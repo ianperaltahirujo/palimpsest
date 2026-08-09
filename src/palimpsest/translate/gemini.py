@@ -176,11 +176,21 @@ class GeminiBackend:
         batch_size: int = 20,
         max_output_tokens_per_unit: int = 4096,
         client: Any | None = None,
+        api_key: str | None = None,
     ):
         """`client`, if given, is used as-is instead of constructing a real
         `genai.Client()` -- the only way tests exercise this class without
         either the real package or a network call (see
-        `tests/fixtures/fake_gemini_client.py`)."""
+        `tests/fixtures/fake_gemini_client.py`).
+
+        `api_key`, if given, is passed straight through to
+        `genai.Client(api_key=...)`. Left `None` (the CLI's own usage, and
+        the server's local/single-user path), the SDK falls back to
+        `GEMINI_API_KEY`/`GOOGLE_API_KEY` from the environment exactly as
+        before this parameter existed. The server never passes a bare
+        `None` here for a real multi-tenant visitor with no configured
+        key -- see `translate.registry._build_one`'s `allow_env_fallback`
+        for where that's actually prevented."""
         if client is None and genai is None:
             raise DependencyError(
                 "the 'google-genai' package is required for the Gemini backend -- "
@@ -189,22 +199,19 @@ class GeminiBackend:
         self.model = model
         self.max_batch = batch_size
         self.max_output_tokens_per_unit = max_output_tokens_per_unit
-        # genai.Client() resolves GEMINI_API_KEY (or GOOGLE_API_KEY) from
-        # the environment on its own -- never accept a key from config or
-        # argv here, so it can never end up in a committed TOML file or a
-        # shell history. Unlike anthropic.Anthropic() (lenient until the
-        # first real call), genai.Client() raises ValueError immediately
-        # if neither variable is set -- caught here and re-raised as a
-        # DependencyError so it surfaces as the same clean, actionable CLI
-        # message as a missing package, not a raw SDK traceback. This is
-        # the default backend, so a brand-new user with no key configured
-        # yet is the expected first encounter with this path, not an edge
-        # case.
+        # Unlike anthropic.Anthropic() (lenient until the first real
+        # call), genai.Client() raises ValueError immediately if no key
+        # was given AND neither env var is set -- caught here and
+        # re-raised as a DependencyError so it surfaces as the same
+        # clean, actionable message as a missing package, not a raw SDK
+        # traceback. This is the default backend, so a brand-new user
+        # with no key configured yet is the expected first encounter
+        # with this path, not an edge case.
         if client is not None:
             self._client: Any = client
         else:
             try:
-                self._client = genai.Client()
+                self._client = genai.Client(api_key=api_key)
             except ValueError as e:
                 raise DependencyError(
                     "no Gemini API key found -- set $GEMINI_API_KEY (or $GOOGLE_API_KEY) in "
@@ -214,11 +221,12 @@ class GeminiBackend:
                 ) from e
 
     @classmethod
-    def from_config(cls, cfg: GeminiBackendConfig) -> GeminiBackend:
+    def from_config(cls, cfg: GeminiBackendConfig, *, api_key: str | None = None) -> GeminiBackend:
         return cls(
             model=cfg.model,
             batch_size=cfg.batch_size,
             max_output_tokens_per_unit=cfg.max_output_tokens_per_unit,
+            api_key=api_key,
         )
 
     # -- single unit ------------------------------------------------------

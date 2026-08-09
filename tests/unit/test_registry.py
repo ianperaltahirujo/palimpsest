@@ -7,6 +7,7 @@ from palimpsest.config.model import (
     GoogleBackendConfig,
     PathsConfig,
 )
+from palimpsest.core.errors import DependencyError
 from palimpsest.text.glossary import Glossary
 from palimpsest.translate.backend import TranslationContext, TranslationResult
 from palimpsest.translate.google import GoogleBackend
@@ -70,6 +71,71 @@ def test_has_credentials_anthropic_checks_its_env_var(monkeypatch):
     assert _has_credentials("anthropic") is True
 
 
+# -- allow_env_fallback: the multi-tenant leak-prevention gate --------------
+#
+# The security property `server/routes.py::_resolve_key` and this module
+# together must guarantee: a caller resolving keys for a non-local
+# visitor with no key of their own (`anthropic_api_key=None`,
+# `allow_env_fallback=False`) must NEVER end up constructing an SDK
+# client that falls back to reading this process's own environment --
+# even when that environment genuinely has a real key sitting in it
+# (the operator's own key, in the hosted-deployment scenario this
+# defends). See `translate.registry.make_backend`'s docstring.
+
+def test_build_one_refuses_env_fallback_for_anthropic_even_when_env_has_a_key(monkeypatch):
+    pytest.importorskip("anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-the-operators-own-key")
+    with pytest.raises(DependencyError):
+        make_backend(_config(name="anthropic"), anthropic_api_key=None, allow_env_fallback=False)
+
+
+def test_build_one_refuses_env_fallback_for_gemini_even_when_env_has_a_key(monkeypatch):
+    pytest.importorskip("google.genai")
+    monkeypatch.setenv("GEMINI_API_KEY", "the-operators-own-key")
+    with pytest.raises(DependencyError):
+        make_backend(_config(name="gemini"), gemini_api_key=None, allow_env_fallback=False)
+
+
+def test_build_one_uses_explicit_key_when_env_fallback_disallowed(monkeypatch):
+    genai = pytest.importorskip("google.genai")
+    from tests.fixtures.fake_gemini_client import FakeGeminiClient
+
+    seen_kwargs = {}
+
+    def _fake_client(**kwargs):
+        seen_kwargs.update(kwargs)
+        return FakeGeminiClient()
+
+    monkeypatch.setattr(genai, "Client", _fake_client)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    backend = make_backend(
+        _config(name="gemini"), gemini_api_key="visitor-own-key", allow_env_fallback=False
+    )
+    assert backend.name == "gemini"
+    assert seen_kwargs.get("api_key") == "visitor-own-key"
+
+
+def test_has_credentials_ignores_env_when_fallback_disallowed(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "the-operators-own-key")
+    assert _has_credentials("anthropic", allow_env_fallback=False) is False
+    assert _has_credentials("anthropic", "a-visitor-key", allow_env_fallback=False) is True
+
+
+def test_make_backend_never_wires_an_env_only_fallback_for_a_scoped_visitor(monkeypatch):
+    """Primary is google (needs no key, always usable); an operator's own
+    ANTHROPIC_API_KEY sits in the environment, exactly as it would on a
+    hosted server. A visitor with no Anthropic key of their own must not
+    get that fallback wired up on their behalf."""
+    pytest.importorskip("anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-the-operators-own-key")
+    backend = make_backend(
+        _config(name="google", fallback="anthropic"),
+        anthropic_api_key=None, allow_env_fallback=False,
+    )
+    assert isinstance(backend, GoogleBackend)  # no FallbackBackend wrapper
+
+
 # -- make_backend: fallback requires usable credentials ----------------------
 #
 # A credential-less fallback is worse than none: FallbackBackend retries
@@ -96,7 +162,7 @@ def test_make_backend_wires_gemini_config_fields(monkeypatch):
     genai = pytest.importorskip("google.genai")
     from tests.fixtures.fake_gemini_client import FakeGeminiClient
 
-    monkeypatch.setattr(genai, "Client", lambda: FakeGeminiClient())
+    monkeypatch.setattr(genai, "Client", lambda **_kwargs: FakeGeminiClient())
     cfg = Config(
         backend=BackendConfig(
             name="gemini", fallback=None,

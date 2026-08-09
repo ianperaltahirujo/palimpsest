@@ -247,7 +247,7 @@ def test_from_config_maps_fields(monkeypatch):
     # lenient until the first real call) -- from_config() doesn't take a
     # client override, so the real constructor is stubbed instead of
     # relying on CI happening to have a key configured.
-    monkeypatch.setattr(gemini_backend.genai, "Client", lambda: FakeGeminiClient())
+    monkeypatch.setattr(gemini_backend.genai, "Client", lambda **_kwargs: FakeGeminiClient())
     cfg = GeminiBackendConfig(
         model="gemini-3.6-flash", batch_size=10, max_output_tokens_per_unit=2048,
     )

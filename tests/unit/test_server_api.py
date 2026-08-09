@@ -33,7 +33,7 @@ def _config(tmp_path) -> Config:
     )
 
 
-def _fake_backend_factory(_config):
+def _fake_backend_factory(_config, **_kwargs):
     return FakeBackend(translate_fn=lambda s: s.upper(), uses_placeholder_protection=False)
 
 
@@ -84,6 +84,138 @@ def test_health(client, monkeypatch):
     assert body["anthropic_key_present"] is False
     assert body["gemini_key_present"] is False
     assert "backend" in body and "version" in body
+
+
+# -- per-visitor key isolation --------------------------------------------
+#
+# Every request in this file until now carried no X-Palimpsest-Visitor
+# header, so it landed in the local sentinel bucket (routes.py's
+# _LOCAL_VISITOR) -- unchanged behavior, covered above. These exercise
+# what's new: two DIFFERENT visitor ids must never see each other's keys.
+
+
+def test_health_key_presence_is_scoped_per_visitor(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_fake_backend_factory)
+    with TestClient(app) as c:
+        c.put(
+            "/api/keys", json={"anthropic_api_key": "sk-ant-visitor-a-key"},
+            headers={"X-Palimpsest-Visitor": "visitor-a"},
+        )
+        resp_a = c.get("/api/health", headers={"X-Palimpsest-Visitor": "visitor-a"})
+        resp_b = c.get("/api/health", headers={"X-Palimpsest-Visitor": "visitor-b"})
+    assert resp_a.json()["anthropic_key_present"] is True
+    assert resp_b.json()["anthropic_key_present"] is False
+    # Never lands in the operator's own environment or .env -- only the
+    # local sentinel's key does (see test_put_keys_sets_env_and_persists_to_dotenv).
+    assert "ANTHROPIC_API_KEY" not in os.environ
+
+
+def test_two_visitors_keys_never_cross(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_fake_backend_factory)
+    with TestClient(app) as c:
+        c.put(
+            "/api/keys", json={"gemini_api_key": "visitor-a-gemini-key"},
+            headers={"X-Palimpsest-Visitor": "visitor-a"},
+        )
+        c.put(
+            "/api/keys", json={"gemini_api_key": "visitor-b-gemini-key"},
+            headers={"X-Palimpsest-Visitor": "visitor-b"},
+        )
+        resp_a = c.get("/api/health", headers={"X-Palimpsest-Visitor": "visitor-a"})
+        resp_b = c.get("/api/health", headers={"X-Palimpsest-Visitor": "visitor-b"})
+    assert resp_a.json()["gemini_key_present"] is True
+    assert resp_b.json()["gemini_key_present"] is True
+    app_state = app.state.palimpsest
+    assert app_state.get_keys("visitor-a")["GEMINI_API_KEY"] == "visitor-a-gemini-key"
+    assert app_state.get_keys("visitor-b")["GEMINI_API_KEY"] == "visitor-b-gemini-key"
+
+
+def test_visitor_header_beats_query_param_fallback(tmp_path, monkeypatch):
+    """SSE/download/page URLs can't set headers, so they pass `?visitor=`
+    instead (see api.js) -- confirm the header wins when both are present
+    (a fetch() call always sends both getApiBase() and the header; the
+    query param exists only for the handful of call sites that can't)."""
+    monkeypatch.chdir(tmp_path)
+    config = _config(tmp_path)
+    app = create_app(config, backend_factory=_fake_backend_factory)
+    with TestClient(app) as c:
+        c.put(
+            "/api/keys", json={"gemini_api_key": "header-visitor-key"},
+            headers={"X-Palimpsest-Visitor": "header-visitor"},
+        )
+        resp = c.get(
+            "/api/health?visitor=query-visitor", headers={"X-Palimpsest-Visitor": "header-visitor"}
+        )
+    assert resp.json()["gemini_key_present"] is True
+
+
+# -- the security-critical case: no silent fallback to the operator's key --
+#
+# routes.py's _resolve_key()/registry.make_backend's allow_env_fallback
+# exist specifically so a real remote visitor with no key of their own
+# can never end up using whatever key the SERVER PROCESS happens to have
+# in its own environment (see app.py's module docstring). This uses the
+# REAL translate.registry.make_backend as backend_factory -- not the
+# FakeBackend every other test in this file uses -- because the fake
+# bypasses key resolution entirely and so can't exercise this at all.
+
+
+def test_non_local_visitor_with_no_key_gets_a_clean_error_not_the_operators_key(
+    tmp_path, monkeypatch
+):
+    pytest.importorskip("anthropic")
+    from palimpsest.config.model import BackendConfig
+    from palimpsest.translate.registry import make_backend as real_make_backend
+
+    monkeypatch.chdir(tmp_path)
+    # The operator's own real credential -- exactly what a hosted
+    # deployment's process environment would have for the local sentinel.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-the-operators-own-real-key")
+    config = _config(tmp_path)
+    config = Config(
+        paths=config.paths, thresholds=config.thresholds, fonts=config.fonts,
+        backend=BackendConfig(name="anthropic", fallback=None),
+    )
+    app = create_app(config, backend_factory=real_make_backend)
+    with TestClient(app) as c:
+        resp = c.post(
+            "/api/estimate", json={"file_ids": []},
+            headers={"X-Palimpsest-Visitor": "a-stranger-with-no-key"},
+        )
+    assert resp.status_code == 503
+    assert "credentials" in resp.json()["detail"].lower() or "key" in resp.json()["detail"].lower()
+
+
+def test_local_sentinel_still_uses_the_env_key_unchanged(tmp_path, monkeypatch):
+    """Same setup as above, minus the visitor header -- the classic
+    single-user desktop workflow must be completely unaffected: the
+    local sentinel's own env key is still used, not refused."""
+    pytest.importorskip("anthropic")
+    import palimpsest.translate.anthropic as anthropic_backend
+    from tests.fixtures.fake_anthropic_client import FakeAnthropicClient
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-the-operators-own-real-key")
+    monkeypatch.setattr(
+        anthropic_backend.anthropic, "Anthropic", lambda **_kwargs: FakeAnthropicClient()
+    )
+    from palimpsest.config.model import BackendConfig
+    from palimpsest.translate.registry import make_backend as real_make_backend
+
+    config = _config(tmp_path)
+    config = Config(
+        paths=config.paths, thresholds=config.thresholds, fonts=config.fonts,
+        backend=BackendConfig(name="anthropic", fallback=None),
+    )
+    app = create_app(config, backend_factory=real_make_backend)
+    with TestClient(app) as c:
+        resp = c.post("/api/estimate", json={"file_ids": []})  # no visitor header at all
+    assert resp.status_code == 200
 
 
 # -- entities ------------------------------------------------------------

@@ -77,17 +77,36 @@ def _visitor_id(request: Request) -> str:
     return header or query or _LOCAL_VISITOR
 
 
+def _resolve_key(state, visitor_id: str, env_name: str) -> str | None:
+    """A per-visitor key always wins. Failing that, ONLY the local
+    sentinel (the classic single-user desktop workflow) falls back to
+    this process's own environment -- a real remote visitor with no key
+    of their own gets `None`, never the operator's own credential. See
+    `translate.registry.make_backend`'s `allow_env_fallback` for the
+    other half of this: `None` reaching that function for a non-local
+    visitor must never be handed to an SDK client, which would perform
+    its own, uncontrolled env fallback."""
+    stored = state.get_keys(visitor_id).get(env_name)
+    if stored:
+        return stored
+    if visitor_id != _LOCAL_VISITOR:
+        return None
+    if env_name == "GEMINI_API_KEY":
+        return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    return os.environ.get(env_name)
+
+
 @router.get("/health", response_model=HealthResponse)
 def health(request: Request) -> HealthResponse:
     from palimpsest import __version__
 
     state = _state(request)
-    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    visitor_id = _visitor_id(request)
     return HealthResponse(
         version=__version__,
         backend=state.config.backend.name,
-        anthropic_key_present=bool(os.environ.get("ANTHROPIC_API_KEY")),
-        gemini_key_present=bool(gemini_key),
+        anthropic_key_present=bool(_resolve_key(state, visitor_id, "ANTHROPIC_API_KEY")),
+        gemini_key_present=bool(_resolve_key(state, visitor_id, "GEMINI_API_KEY")),
     )
 
 
@@ -99,14 +118,24 @@ def put_keys(request: Request, body: SetKeysRequest) -> HealthResponse:
     # page instead of a shell. A field left absent/empty is a no-op, not
     # a clear -- see SetKeysRequest. Never echoes the raw value back;
     # health() reports presence only, exactly like every other read path.
+    #
+    # Every visitor's key is remembered in AppState._keys (in-memory
+    # only). Only the local sentinel's key ALSO goes to this process's
+    # own environment and its .env file -- a real remote visitor's key
+    # must never land in a place `_resolve_key` would hand back to a
+    # DIFFERENT visitor (the local-sentinel fallback) or that survives
+    # to leak into a later, unrelated process restart.
     state = _state(request)
+    visitor_id = _visitor_id(request)
     for env_name, value in (
         ("ANTHROPIC_API_KEY", body.anthropic_api_key),
         ("GEMINI_API_KEY", body.gemini_api_key),
     ):
         if value:
-            os.environ[env_name] = value
-            set_key(str(state.dotenv_path), env_name, value)
+            state.set_key(visitor_id, env_name, value)
+            if visitor_id == _LOCAL_VISITOR:
+                os.environ[env_name] = value
+                set_key(str(state.dotenv_path), env_name, value)
     return health(request)
 
 
@@ -169,10 +198,32 @@ def _cache_for(rel: str, state, backend) -> Cache:
     return Cache(cache_path, namespace=namespace)
 
 
+def _backend_for_visitor(state, request: Request, config=None):
+    """Resolves this visitor's keys and builds a backend via
+    `state.backend_factory` -- the one place `estimate()`/`create_job()`
+    share this logic. `allow_env_fallback` is only `True` for the local
+    sentinel (see `_resolve_key`'s and `translate.registry.make_backend`'s
+    docstrings for why a non-local visitor must never get it): a real
+    visitor with no key configured gets a clean 503, never a client
+    silently constructed against the operator's own environment."""
+    visitor_id = _visitor_id(request)
+    anthropic_key = _resolve_key(state, visitor_id, "ANTHROPIC_API_KEY")
+    gemini_key = _resolve_key(state, visitor_id, "GEMINI_API_KEY")
+    try:
+        return state.backend_factory(
+            config if config is not None else state.config,
+            anthropic_api_key=anthropic_key,
+            gemini_api_key=gemini_key,
+            allow_env_fallback=(visitor_id == _LOCAL_VISITOR),
+        )
+    except DependencyError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
 @router.post("/estimate", response_model=list[DocumentEstimateResponse])
 def estimate(request: Request, body: EstimateRequest) -> list[DocumentEstimateResponse]:
     state = _state(request)
-    backend = state.backend_factory(state.config)
+    backend = _backend_for_visitor(state, request)
     ctx = TranslationContext(
         source_lang=state.config.language.source, target_lang=state.config.language.target,
         entities=state.entities, glossary=state.glossary.terms,
@@ -243,7 +294,7 @@ def create_job(request: Request, body: CreateJobRequest) -> CreateJobResponse:
         config = dataclasses.replace(
             config, backend=dataclasses.replace(config.backend, name=body.backend)
         )
-    backend = state.backend_factory(config)
+    backend = _backend_for_visitor(state, request, config)
 
     job = state.jobs.create(uploaded, backend_name=backend.name, dual=body.dual)
     uploaded_by_id = {u.file_id: u for u in uploaded}

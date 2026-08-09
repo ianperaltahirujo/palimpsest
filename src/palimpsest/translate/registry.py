@@ -24,7 +24,7 @@ from collections.abc import Sequence
 
 from palimpsest.config.model import Config
 from palimpsest.core import paths as core_paths
-from palimpsest.core.errors import ConfigError
+from palimpsest.core.errors import ConfigError, DependencyError
 from palimpsest.text.glossary import Glossary
 from palimpsest.text.protect import all_tokens_restored, build_protect_re, protect, restore
 from palimpsest.translate.backend import Backend, Cost, TranslationContext, TranslationResult
@@ -35,46 +35,82 @@ from palimpsest.translate.translator import Translator
 _KNOWN = ("google", "anthropic", "gemini")
 
 
-def _has_credentials(name: str) -> bool:
-    """Best-effort check of the env var each backend's own SDK resolves
-    a key from -- used only to decide whether it's worth wiring up as a
-    FALLBACK (see `make_backend`), never to gate using it as the primary
-    backend directly (each backend's own constructor is the source of
-    truth there, and raises its own clear error if misconfigured).
+def _has_credentials(
+    name: str,
+    anthropic_api_key: str | None = None,
+    gemini_api_key: str | None = None,
+    *,
+    allow_env_fallback: bool = True,
+) -> bool:
+    """Best-effort check of whether a key is available for `name` -- used
+    only to decide whether it's worth wiring up as a FALLBACK (see
+    `make_backend`), never to gate using it as the primary backend
+    directly (each backend's own constructor is the source of truth
+    there, and raises its own clear error if misconfigured).
 
-    Deliberately checks only the documented env var, not every auth
-    method the underlying SDK supports (e.g. anthropic's `auth_token` or
-    an `ant auth login` profile) -- getting this wrong in the "available"
-    direction would just mean the fallback attempt fails as before this
-    check existed; getting it wrong in the "unavailable" direction only
-    means a working alternate-auth fallback doesn't get used, which is
-    the same experience as not configuring a fallback at all. Neither
-    failure mode crashes anything, unlike skipping this check entirely."""
+    An explicit `anthropic_api_key`/`gemini_api_key` (a per-visitor key
+    resolved by the server, see `server/routes.py::_resolve_key`) always
+    wins. Failing that, `allow_env_fallback` (default `True`, matching
+    the CLI's and the server's local/single-user behavior) checks the
+    documented env var each backend's own SDK would otherwise resolve a
+    key from -- deliberately only that var, not every auth method the
+    SDK supports (e.g. anthropic's `auth_token` or an `ant auth login`
+    profile), since getting this wrong in the "available" direction just
+    means the fallback attempt fails as before this check existed.
+
+    `allow_env_fallback=False` is what the server passes for any visitor
+    other than the local one (`server/routes.py::_LOCAL_VISITOR`) -- an
+    unrelated credential sitting in this process's own environment (the
+    OPERATOR's key) must never get silently wired up as a fallback for
+    a random public visitor who didn't supply their own."""
     if name == "google":
         return True  # deep_translator's free scrape, no key at all
     if name == "gemini":
-        return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+        if gemini_api_key:
+            return True
+        return allow_env_fallback and bool(
+            os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        )
     if name == "anthropic":
-        return bool(os.environ.get("ANTHROPIC_API_KEY"))
+        if anthropic_api_key:
+            return True
+        return allow_env_fallback and bool(os.environ.get("ANTHROPIC_API_KEY"))
     return False
 
 
-def _build_one(name: str, config: Config) -> Backend:
+def _build_one(
+    name: str,
+    config: Config,
+    *,
+    anthropic_api_key: str | None = None,
+    gemini_api_key: str | None = None,
+    allow_env_fallback: bool = True,
+) -> Backend:
     if name == "google":
         g = config.backend.google
         return GoogleBackend(max_batch=g.batch_size, retry_pause=g.pause_seconds)
     if name == "anthropic":
         from palimpsest.translate.anthropic import AnthropicBackend
 
-        return AnthropicBackend.from_config(config.backend.anthropic)
+        if anthropic_api_key is None and not allow_env_fallback:
+            raise DependencyError("no Anthropic API key configured for this session")
+        return AnthropicBackend.from_config(config.backend.anthropic, api_key=anthropic_api_key)
     if name == "gemini":
         from palimpsest.translate.gemini import GeminiBackend
 
-        return GeminiBackend.from_config(config.backend.gemini)
+        if gemini_api_key is None and not allow_env_fallback:
+            raise DependencyError("no Gemini API key configured for this session")
+        return GeminiBackend.from_config(config.backend.gemini, api_key=gemini_api_key)
     raise ConfigError(f"unknown backend {name!r} (expected one of {_KNOWN})")
 
 
-def make_backend(config: Config) -> Backend:
+def make_backend(
+    config: Config,
+    *,
+    anthropic_api_key: str | None = None,
+    gemini_api_key: str | None = None,
+    allow_env_fallback: bool = True,
+) -> Backend:
     """The backend named by `[backend].name`, wrapped with the one named
     by `[backend].fallback` if configured, different, and actually usable.
 
@@ -87,14 +123,34 @@ def make_backend(config: Config) -> Backend:
     per-unit failure (see `translate.anthropic`'s lazy credential
     resolution) -- crashing the whole job instead of leaving that one
     unit honestly untranslated and continuing, exactly what would have
-    happened with no fallback configured."""
-    primary = _build_one(config.backend.name, config)
+    happened with no fallback configured.
+
+    `anthropic_api_key`/`gemini_api_key`/`allow_env_fallback` exist for
+    the server's per-visitor credential resolution (see
+    `server/routes.py::_resolve_key`) -- the CLI's own call site never
+    passes them, which reproduces today's behavior exactly (`None` +
+    `allow_env_fallback=True` is indistinguishable from the SDKs' own
+    default env resolution). See `_build_one`/`_has_credentials` for how
+    `allow_env_fallback=False` prevents ever constructing an SDK client
+    with a key silently pulled from this process's own environment on a
+    visitor's behalf."""
+    primary = _build_one(
+        config.backend.name, config,
+        anthropic_api_key=anthropic_api_key, gemini_api_key=gemini_api_key,
+        allow_env_fallback=allow_env_fallback,
+    )
     fallback_name = config.backend.fallback
     if not fallback_name or fallback_name == config.backend.name:
         return primary
-    if not _has_credentials(fallback_name):
+    if not _has_credentials(
+        fallback_name, anthropic_api_key, gemini_api_key, allow_env_fallback=allow_env_fallback
+    ):
         return primary
-    fallback = _build_one(fallback_name, config)
+    fallback = _build_one(
+        fallback_name, config,
+        anthropic_api_key=anthropic_api_key, gemini_api_key=gemini_api_key,
+        allow_env_fallback=allow_env_fallback,
+    )
     return FallbackBackend(primary, fallback)
 
 
