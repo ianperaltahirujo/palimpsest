@@ -27,6 +27,13 @@ rules exist specifically to keep it that way:
 - No test may make a real network call. Mark anything that legitimately
   needs one `@pytest.mark.network` (or `@pytest.mark.ocr` for a real
   Tesseract dependency) — both are deselected in CI by default.
+- **After editing `README.md`, run `python tools/render_pypi_readme.py`
+  and commit the resulting `README.pypi.md`.** The two files necessarily
+  diverge (`README.md`'s relative links/images are what keeps GitHub's
+  render free of a background box around the logo; PyPI's renderer needs
+  the opposite, since it has no repo to resolve a relative path against
+  at all) — see that script's own docstring for the full reasoning. CI
+  fails if the generated file is out of sync with the source.
 
 ## Releasing
 
