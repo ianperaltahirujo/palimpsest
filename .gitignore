@@ -53,6 +53,13 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# --- Local-only assistant notes -------------------------------------------
+# Working notes for AI coding assistants -- local to this machine's
+# session, not part of the project's own documentation.
+/CLAUDE.md
+/CODEX.md
+/handoff.md
+
 # --- JS (web/prototype) ---------------------------------------------------
 node_modules/
 
