@@ -1,16 +1,45 @@
-# palimpsest
+<p align="center">
+  <img src="docs/assets/logo.svg" width="88" height="88" alt="palimpsest logo — two overlapping page outlines in register">
+</p>
 
-*A palimpsest is a manuscript page scraped clean so the surface can be
-reused — the original artwork and impressions intact, new text written
-over it. That's what this tool does to a document: same pages, same
-artwork, same typography — only the words change.*
+<h1 align="center">palimpsest</h1>
 
-Layout-preserving Spanish→English document translation for PDF and
-Office formats (`.pptx` / `.xlsx` / `.docx`): OCR when there's no text
-layer, styled-run extraction, in-place redraw with real embedded fonts,
-entity/glossary-aware machine translation (Gemini, Claude, or Google
-Translate), and an honest translation cache that never lets a failed
-translation masquerade as a successful one.
+<p align="center">
+  <i>A palimpsest is a manuscript page scraped clean so the surface can be reused — the<br>
+  original artwork and impressions intact, new text written over it. That's what this<br>
+  tool does to a document: same pages, same artwork, same typography — only the words change.</i>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ianperaltahirujo/palimpsest/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ianperaltahirujo/palimpsest/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg">
+  <a href="CONTRIBUTING.md"><img alt="No network calls in tests" src="https://img.shields.io/badge/tests-no%20network%20calls-informational.svg"></a>
+</p>
+
+<p align="center">
+  Layout-preserving Spanish→English document translation for PDF and Office formats
+  (<code>.docx</code> / <code>.pptx</code> / <code>.xlsx</code>) — as a CLI, a library, or a local web UI.
+</p>
+
+<p align="center">
+  <img src="docs/assets/demo.gif" width="820" alt="Demo: dropping a document, estimating cost, translating it, and comparing the original against the translated page side by side">
+</p>
+
+OCR when there's no text layer, styled-run extraction, in-place redraw with real
+embedded fonts, entity/glossary-aware machine translation (Gemini, Claude, or Google
+Translate), and an honest translation cache that never lets a failed translation
+masquerade as a successful one.
+
+- **Replicas, not rebuilds** — same pages, same fonts, same artwork; only the prose changes.
+- **Protected entities** — company names, personal names, and amounts survive verbatim, guaranteed.
+- **Three backends, one protocol** — Gemini (free tier, default), Claude (paid, highest quality), or Google Translate (free, no key).
+- **An honest report, always** — a paragraph that fails to translate is never silently dropped or rendered as if it succeeded.
+- **A local web UI**, in addition to the CLI and the library — drop a file, watch it translate, compare pages side by side.
+
+**Contents:** [Install](#install) · [Quickstart](#quickstart) · [Web UI](#web-ui) ·
+[Why this exists](#why-this-exists-not-just-what-it-does) · [Architecture](#architecture) ·
+[Contributing](#contributing) · [License](#license)
 
 ## Install
 
@@ -25,7 +54,7 @@ pip install palimpsest-translate[all]       # everything
 Requires Python 3.11+. Not yet on PyPI — until then, install from a clone:
 
 ```bash
-git clone https://github.com/<owner>/palimpsest.git
+git clone https://github.com/ianperaltahirujo/palimpsest.git
 cd palimpsest
 pip install -e ".[all,dev]"
 ```

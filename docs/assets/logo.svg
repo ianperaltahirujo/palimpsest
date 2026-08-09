@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="96" height="96">
+  <!-- README header copy of the "two pages in register" mark
+       (web/prototype/src/components/Logo.jsx / public/favicon.svg) --
+       two overlapping page outlines, offset diagonally: same page,
+       two languages, exactly aligned. Indigo ink over an oxblood page
+       showing through, so the mark itself reads as an old,
+       scraped-and-rewritten document. Padded to a 28x28 canvas (vs.
+       the favicon's tight 24x24) so the strokes have breathing room at
+       header size. Keep in sync if that palette changes. -->
+  <rect x="4" y="5" width="14.5" height="17.5" rx="1.1" fill="none" stroke="#7A2E2E" stroke-width="1.5" />
+  <rect x="7.5" y="3.5" width="14.5" height="17.5" rx="1.1" fill="none" stroke="#2E3B63" stroke-width="1.5" />
+</svg>
