@@ -21,8 +21,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copied before the rest of the source so `pip install` only reruns when
-# dependencies actually change, not on every source edit.
-COPY pyproject.toml README.md ./
+# dependencies actually change, not on every source edit. README.pypi.md,
+# not README.md -- pyproject.toml's `readme` field points at the former
+# (see tools/render_pypi_readme.py), and hatchling errors out at install
+# time if the file it names isn't present.
+COPY pyproject.toml README.pypi.md ./
 COPY src/ ./src/
 RUN pip install --no-cache-dir ".[server,ocr,anthropic,gemini]"
 
