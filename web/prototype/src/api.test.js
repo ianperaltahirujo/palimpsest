@@ -107,9 +107,10 @@ describe("success path", () => {
 });
 
 describe("URL builders (no network)", () => {
-  it("downloadUrl includes the file query param only when given", () => {
-    expect(downloadUrl("job1", "replica")).toBe("/api/jobs/job1/download/replica");
-    expect(downloadUrl("job1", "replica", "file1")).toBe("/api/jobs/job1/download/replica?file=file1");
+  it("downloadUrl always carries the visitor id, and the file param only when given", () => {
+    expect(downloadUrl("job1", "replica")).toMatch(/^\/api\/jobs\/job1\/download\/replica\?visitor=/);
+    expect(downloadUrl("job1", "replica")).not.toContain("file=");
+    expect(downloadUrl("job1", "replica", "file1")).toContain("file=file1");
   });
 
   it("pageUrl defaults side to output and encodes params", () => {
@@ -117,6 +118,7 @@ describe("URL builders (no network)", () => {
     expect(url).toContain("/api/jobs/job1/pages/2.png?");
     expect(url).toContain("side=output");
     expect(url).toContain("file=f+1");
+    expect(url).toContain("visitor=");
   });
 
   it("getLayout issues a plain GET (no method/body) with page/file query params", async () => {
@@ -126,6 +128,24 @@ describe("URL builders (no network)", () => {
     expect(url).toContain("/api/jobs/job1/layout?");
     expect(url).toContain("page=3");
     expect(url).toContain("file=f1");
-    expect(options).toEqual({}); // request()'s default -- no method means GET
+    // request()'s default -- no method/body means GET, but the visitor
+    // header is always attached.
+    expect(options.method).toBeUndefined();
+    expect(options.body).toBeUndefined();
+    expect(options.headers["X-Palimpsest-Visitor"]).toBeTruthy();
+  });
+});
+
+describe("visitor id header", () => {
+  it("is attached on every request and stable across calls", async () => {
+    mockFetchOnce(jsonResponse({ companies: [], people: [], places: [], other: [] }));
+    await getEntities();
+    const first = global.fetch.mock.calls[0][1].headers["X-Palimpsest-Visitor"];
+    expect(first).toBeTruthy();
+
+    mockFetchOnce(jsonResponse({ companies: [], people: [], places: [], other: [] }));
+    await getEntities();
+    const second = global.fetch.mock.calls[0][1].headers["X-Palimpsest-Visitor"];
+    expect(second).toBe(first);
   });
 });

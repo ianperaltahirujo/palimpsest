@@ -1,4 +1,5 @@
 import { getApiBase } from "./config.js";
+import { getVisitorId } from "./visitor.js";
 
 // Thin fetch wrapper for the palimpsest server (src/palimpsest/server/).
 // Every function here mirrors one route in server/routes.py 1:1 -- see
@@ -13,10 +14,13 @@ export class ApiError extends Error {
   }
 }
 
+const VISITOR_HEADER = "X-Palimpsest-Visitor";
+
 async function request(path, options = {}) {
+  const headers = { ...options.headers, [VISITOR_HEADER]: getVisitorId() };
   let res;
   try {
-    res = await fetch(`${getApiBase()}${path}`, options);
+    res = await fetch(`${getApiBase()}${path}`, { ...options, headers });
   } catch (e) {
     // Network-level failure (server not running, refused connection) --
     // distinct from an HTTP error status, which the caller may want to
@@ -113,7 +117,11 @@ export function getJob(jobId) {
 // close it themselves on the happy path, only via the returned
 // unsubscribe if they navigate away early.
 export function watchJob(jobId, { onEvent, onDone, onError } = {}) {
-  const source = new EventSource(`${getApiBase()}/api/jobs/${jobId}/events`);
+  // EventSource (unlike fetch) can't set custom headers, so the visitor id
+  // travels as a query param here instead -- the server's _visitor_id()
+  // helper checks both places for exactly this reason.
+  const q = `?visitor=${encodeURIComponent(getVisitorId())}`;
+  const source = new EventSource(`${getApiBase()}/api/jobs/${jobId}/events${q}`);
   source.onmessage = (msg) => {
     let payload;
     try {
@@ -134,13 +142,17 @@ export function watchJob(jobId, { onEvent, onDone, onError } = {}) {
   return () => source.close();
 }
 
+// downloadUrl/pageUrl feed an <a href>/<img src> directly rather than
+// fetch(), so (like watchJob's EventSource) they can't attach the visitor
+// header -- the visitor id rides along as a query param instead.
 export function downloadUrl(jobId, artifact, fileId) {
-  const q = fileId ? `?file=${encodeURIComponent(fileId)}` : "";
-  return `${getApiBase()}/api/jobs/${jobId}/download/${artifact}${q}`;
+  const params = new URLSearchParams({ visitor: getVisitorId() });
+  if (fileId) params.set("file", fileId);
+  return `${getApiBase()}/api/jobs/${jobId}/download/${artifact}?${params}`;
 }
 
 export function pageUrl(jobId, pageNo, { side = "output", fileId, dpi, v } = {}) {
-  const params = new URLSearchParams({ side });
+  const params = new URLSearchParams({ side, visitor: getVisitorId() });
   if (fileId) params.set("file", fileId);
   if (dpi) params.set("dpi", String(dpi));
   // Cache-buster: the browser has no way to know a reflowed page's PNG

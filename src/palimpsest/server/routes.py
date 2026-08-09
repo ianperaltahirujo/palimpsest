@@ -56,6 +56,27 @@ def _state(request: Request):
     return request.app.state.palimpsest
 
 
+# Every visitor is scoped to a browser-generated id (web/prototype/src/
+# visitor.js) sent as the X-Palimpsest-Visitor header on fetch() calls, or
+# as a `visitor` query param on the few requests that can't set custom
+# headers at all (EventSource for job_events, <img>/<a> for page_png and
+# download). A request with neither -- curl, scripts, an older frontend,
+# or the classic single-user desktop workflow -- falls back to one fixed
+# local sentinel, which is exactly today's implicit behavior (one local
+# user, one implicit scope) made explicit rather than assumed. This is
+# NOT an auth mechanism: nothing is signed, nothing stops a client from
+# sending a different id on purpose. It only stops one visitor's browser
+# from accidentally seeing another's uploads/jobs/keys during normal use.
+_LOCAL_VISITOR = "local"
+_VISITOR_HEADER = "X-Palimpsest-Visitor"
+
+
+def _visitor_id(request: Request) -> str:
+    header = request.headers.get(_VISITOR_HEADER)
+    query = request.query_params.get("visitor")
+    return header or query or _LOCAL_VISITOR
+
+
 @router.get("/health", response_model=HealthResponse)
 def health(request: Request) -> HealthResponse:
     from palimpsest import __version__
