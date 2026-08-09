@@ -8,7 +8,7 @@ import { MOCK } from "../config.js";
 import { UPLOAD_ACCEPT } from "../accept.js";
 
 export default function Sample() {
-  const { goto, addUploads } = useAppState();
+  const { goto, addUploads, markDropzoneTouched } = useAppState();
   const t = useT();
 
   async function handleFiles(files) {
@@ -30,6 +30,7 @@ export default function Sample() {
           dropzone bar beneath it -- matches the copy below. */}
       <div
         onDragOver={(e) => e.preventDefault()}
+        onDragEnter={markDropzoneTouched}
         onDrop={(e) => {
           e.preventDefault();
           handleFiles(Array.from(e.dataTransfer.files || []));
@@ -52,7 +53,15 @@ export default function Sample() {
         {t("sample.caption")}
       </Text>
 
-      <Dropzone onDrop={handleFiles} mt={26} accept={UPLOAD_ACCEPT} acceptColor="accept" rejectColor="flag">
+      <Dropzone
+        onDrop={handleFiles}
+        onDragEnter={markDropzoneTouched}
+        onFileDialogOpen={markDropzoneTouched}
+        mt={26}
+        accept={UPLOAD_ACCEPT}
+        acceptColor="accept"
+        rejectColor="flag"
+      >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <Text fw={700} size="sm">

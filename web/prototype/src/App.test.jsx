@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -59,11 +59,30 @@ describe("global unreachable banner", () => {
     );
   }
 
-  it("appears on load when the health probe fails, with no user action needed", async () => {
+  it("does not appear on load, before any dropzone interaction, even when the health probe fails", async () => {
+    // A brand-new visitor who hasn't touched the dropzone yet shouldn't
+    // be instantly greeted with a warning before they've done anything.
     api.health.mockRejectedValue(new Error("could not reach the server"));
     renderApp();
 
+    await waitFor(() => expect(api.health).toHaveBeenCalled());
+    expect(screen.queryByText("Couldn't reach the server")).not.toBeInTheDocument();
+  });
+
+  it("appears, alongside a one-time setup-hint toast, once the user touches the dropzone", async () => {
+    api.health.mockRejectedValue(new Error("could not reach the server"));
+    renderApp();
+
+    await waitFor(() => expect(api.health).toHaveBeenCalled());
+    // react-dropzone only invokes the user's onDragEnter once it sees a
+    // "Files" drag type on dataTransfer -- a bare dragEnter with no
+    // dataTransfer is silently ignored, same as a drag of plain text.
+    fireEvent.dragEnter(await screen.findByText("Drop a file here to start now"), {
+      dataTransfer: { types: ["Files"], files: [] },
+    });
+
     expect(await screen.findByText("Couldn't reach the server")).toBeInTheDocument();
+    expect(await screen.findByText("Set up a backend first")).toBeInTheDocument();
   });
 
   it("does not appear once the server is reachable", async () => {

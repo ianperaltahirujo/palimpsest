@@ -34,6 +34,15 @@ export function AppStateProvider({ children }) {
   const [health, setHealth] = useState(null);
   const [healthError, setHealthError] = useState(null);
 
+  // A brand-new visitor who hasn't touched the dropzone yet shouldn't be
+  // instantly greeted with "can't reach the server" before they've done
+  // anything -- the unreachable banner (App.jsx) only renders once this
+  // flips true. App.jsx also fires a one-time hint toast off the same
+  // flag, pointing them at setup instead of just leaving them to guess
+  // from the banner alone.
+  const [dropzoneTouched, setDropzoneTouched] = useState(false);
+  const markDropzoneTouched = useCallback(() => setDropzoneTouched(true), []);
+
   const refreshHealth = useCallback(() => {
     if (MOCK) return Promise.resolve(null);
     setHealthError(null);
@@ -172,6 +181,8 @@ export function AppStateProvider({ children }) {
     health,
     healthError,
     refreshHealth,
+    dropzoneTouched,
+    markDropzoneTouched,
   };
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

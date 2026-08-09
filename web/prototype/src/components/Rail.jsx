@@ -41,7 +41,13 @@ export default function Rail({ showSuggested, onCollapse }) {
 
   useEffect(() => {
     if (MOCK) return;
-    api.getEntities().then(setGroups).catch((e) => notifications.show({ message: e.message, color: "flag" }));
+    // Silent on failure -- this fires on mount, before the visitor has
+    // done anything, and a new visitor with no server set up yet WILL
+    // fail this fetch every time. Falling back to EMPTY_GROUPS already
+    // reads as "nothing configured", so there's nothing actionable to
+    // toast; App.jsx's unreachable banner + setup hint own telling them
+    // why once they've actually started (touched the dropzone).
+    api.getEntities().then(setGroups).catch(() => {});
   }, []);
 
   // Every mutation goes through this so real mode PUTs the new roster

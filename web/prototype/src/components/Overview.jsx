@@ -9,7 +9,7 @@ import { UPLOAD_ACCEPT } from "../accept.js";
 const STEP_KEYS = ["overview.step1", "overview.step2", "overview.step3"];
 
 export default function Overview() {
-  const { goto, addUploads } = useAppState();
+  const { goto, addUploads, markDropzoneTouched } = useAppState();
   const t = useT();
 
   async function handleDrop(files) {
@@ -66,7 +66,16 @@ export default function Overview() {
         {t("overview.cta")}
       </Button>
 
-      <Dropzone onDrop={handleDrop} mt={40} p={28} accept={UPLOAD_ACCEPT} acceptColor="accept" rejectColor="flag">
+      <Dropzone
+        onDrop={handleDrop}
+        onDragEnter={markDropzoneTouched}
+        onFileDialogOpen={markDropzoneTouched}
+        mt={40}
+        p={28}
+        accept={UPLOAD_ACCEPT}
+        acceptColor="accept"
+        rejectColor="flag"
+      >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", minHeight: 76 }}>
           <div>
             <Text fw={700} size="sm">

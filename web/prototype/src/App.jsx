@@ -1,5 +1,7 @@
+import { useEffect, useRef } from "react";
 import { ActionIcon, Alert, Anchor, AppShell, Burger, Group, ScrollArea, Text, Tooltip, UnstyledButton } from "@mantine/core";
 import { useDisclosure, useLocalStorage } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import { IconAlertTriangle, IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
 import { AppStateProvider, useAppState } from "./state.jsx";
 import { T, useT } from "./i18n.jsx";
@@ -38,12 +40,27 @@ export function serveCommand() {
 }
 
 function Shell() {
-  const { screen, goto, apiError, setApiError, healthError } = useAppState();
+  const { screen, goto, apiError, setApiError, healthError, dropzoneTouched } = useAppState();
   const t = useT();
   const [mobileOpen, { toggle: toggleMobile }] = useDisclosure(false);
   const [desktopCollapsed, setDesktopCollapsed] = useLocalStorage({ key: "pp-rail-collapsed", defaultValue: false });
   const ScreenComponent = SCREEN_COMPONENTS[screen] ?? Overview;
   const showSuggested = screen !== "overview" && screen !== "sample";
+
+  // Fires once -- the first time a visitor who has touched the dropzone
+  // turns out to have no reachable server -- rather than on every health
+  // re-probe, so it reads as a one-time nudge toward setup, not a nag.
+  const setupHintShown = useRef(false);
+  useEffect(() => {
+    if (MOCK || !dropzoneTouched || !healthError || setupHintShown.current) return;
+    setupHintShown.current = true;
+    notifications.show({
+      title: t("app.setupHintTitle"),
+      message: t("app.setupHintBody"),
+      color: "flag",
+      autoClose: 8000,
+    });
+  }, [dropzoneTouched, healthError, t]);
 
   return (
     <AppShell
@@ -97,13 +114,14 @@ function Shell() {
             the same underlying "can't reach the server" fact and
             stacking them would just repeat it. This one is health-probe
             driven (state.jsx), so unlike apiError it doesn't need a user
-            action to appear -- it's live on load, and on every backend
-            selected (BackendSelector's own inline notice used to disappear
-            entirely for the "google" backend, which needs no key but
-            still needs a reachable server for translation itself). Not
+            action to appear -- it's live the moment the probe resolves.
+            Gated on dropzoneTouched so a brand-new visitor who hasn't
+            interacted with the dropzone yet isn't instantly greeted with
+            a warning before they've done anything (see state.jsx's
+            setup-hint toast, which fires once at the same trigger). Not
             dismissible: it reflects current health, not a one-time event,
             and disappears on its own the moment a probe succeeds. */}
-        {!MOCK && !apiError && healthError && (
+        {!MOCK && !apiError && healthError && dropzoneTouched && (
           <Alert
             icon={<IconAlertTriangle size={16} />}
             color="flag"

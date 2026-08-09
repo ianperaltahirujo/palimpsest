@@ -22,6 +22,8 @@ export const STRINGS = {
     "app.showSidebar": "Show sidebar",
     "app.backendUnreachable": "Couldn't reach the server",
     "app.serverUnreachableBody": "No local server is answering at the address in the sidebar. Start one with `{cmd}`.",
+    "app.setupHintTitle": "Set up a backend first",
+    "app.setupHintBody": "No server is reachable yet. Open the sidebar and pick a backend -- Gemini's free tier just needs an API key, no billing required -- then try again.",
 
     "footer.github": "GitHub ↗",
     "footer.pypi": "PyPI ↗",
@@ -245,6 +247,8 @@ export const STRINGS = {
     "app.showSidebar": "Mostrar barra lateral",
     "app.backendUnreachable": "No se pudo conectar con el servidor",
     "app.serverUnreachableBody": "Ningún servidor local responde en la dirección de la barra lateral. Inícialo con `{cmd}`.",
+    "app.setupHintTitle": "Configura un backend primero",
+    "app.setupHintBody": "Todavía no hay ningún servidor disponible. Abre la barra lateral y elige un backend -- el nivel gratuito de Gemini solo necesita una clave de API, sin configurar facturación -- y vuelve a intentarlo.",
 
     "footer.github": "GitHub ↗",
     "footer.pypi": "PyPI ↗",
