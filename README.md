@@ -1,6 +1,8 @@
 <h1 align="center">
-  <img src="docs/assets/logo.png" width="48" height="48" valign="middle" alt="palimpsest logo — two overlapping page outlines in register">
-  palimpsest
+  <a href="https://ianperaltahirujo.github.io/palimpsest/">
+    <img src="docs/assets/logo.png" width="48" height="48" valign="middle" alt="palimpsest logo — two overlapping page outlines in register">
+    palimpsest
+  </a>
 </h1>
 
 <p align="center">
@@ -22,7 +24,9 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/demo.gif" width="820" alt="Demo: dropping a document, estimating cost, translating it, and comparing the original against the translated page side by side">
+  <a href="https://ianperaltahirujo.github.io/palimpsest/">
+    <img src="docs/assets/demo.gif" width="820" alt="Demo: dropping a document, estimating cost, translating it, and comparing the original against the translated page side by side">
+  </a>
 </p>
 
 OCR when there's no text layer, styled-run extraction, in-place redraw with real
