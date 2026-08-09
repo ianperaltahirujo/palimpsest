@@ -1,8 +1,9 @@
-import { Button, Group, Progress, SimpleGrid, Text, Title } from "@mantine/core";
+import { Alert, Button, Group, Progress, SimpleGrid, Text, Title } from "@mantine/core";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { ESTIMATE } from "../state.jsx";
 import { useAppState } from "../state.jsx";
-import { useT } from "../i18n.jsx";
+import { T, useT } from "../i18n.jsx";
 import { MOCK } from "../config.js";
 
 function Cell({ label, value, sub, valueColor, bar }) {
@@ -61,6 +62,16 @@ export default function Estimate() {
   const cacheHitPct = agg.uniqueStrings ? (100 * agg.cacheHits) / agg.uniqueStrings : 0;
   const docCount = MOCK ? 2 : uploads.length;
 
+  // POST /api/estimate opens the RAW upload and never OCRs -- server-side,
+  // routes.py's estimate() reads the file directly while the real pipeline
+  // (pdf/pipeline.py) calls ensure_ocr() FIRST. So a scan has no text layer
+  // at this point and every number for it comes back 0, with usd null. We
+  // deliberately do NOT OCR here (minutes per document, and it would time
+  // out on a free-tier host) -- we say so instead. Translation is unaffected;
+  // it OCRs on its way through.
+  const scanCount = MOCK ? 0 : estimates.filter((e) => e.kind === "scan").length;
+  const allScans = scanCount > 0 && scanCount === estimates.length;
+
   async function handleTranslate() {
     if (MOCK) {
       goto("running", { animate: true });
@@ -86,25 +97,41 @@ export default function Estimate() {
         {t("estimate.body")}
       </Text>
 
-      <SimpleGrid cols={{ base: 2, sm: 4 }} spacing={1} mt={24} style={{ background: "var(--pp-rule)", border: "1px solid var(--pp-rule)", borderRadius: 3, overflow: "hidden" }}>
-        <Cell label={t("estimate.paragraphs")} value={agg.paragraphs} sub={t("estimate.uniqueStrings", { n: agg.uniqueStrings })} />
-        <Cell
-          label={t("estimate.cacheHits")}
-          value={<>{agg.cacheHits}<span style={{ fontSize: 15, color: "var(--pp-ink-faint)" }}>/{agg.uniqueStrings}</span></>}
-          sub={t("estimate.cacheSub")}
-          bar={cacheHitPct}
-        />
-        <Cell
-          label={t("estimate.tokens")}
-          value={<span style={{ fontSize: 19 }}>{agg.tokensIn} <span style={{ fontSize: 12, color: "var(--pp-ink-faint)" }}>{t("estimate.in")}</span> / {agg.tokensOut} <span style={{ fontSize: 12, color: "var(--pp-ink-faint)" }}>{t("estimate.out")}</span></span>}
-          sub={modelLabel}
-        />
-        <Cell label={t("estimate.cost")} value={costText} sub={t("estimate.costSub")} valueColor="var(--pp-register-ink)" />
-      </SimpleGrid>
+      {allScans ? (
+        <Alert icon={<IconAlertTriangle size={16} />} color="warn" variant="light" mt={24}>
+          <Text size="sm">
+            <T k="estimate.allScansBody" />
+          </Text>
+        </Alert>
+      ) : (
+        <>
+          <SimpleGrid cols={{ base: 2, sm: 4 }} spacing={1} mt={24} style={{ background: "var(--pp-rule)", border: "1px solid var(--pp-rule)", borderRadius: 3, overflow: "hidden" }}>
+            <Cell label={t("estimate.paragraphs")} value={agg.paragraphs} sub={t("estimate.uniqueStrings", { n: agg.uniqueStrings })} />
+            <Cell
+              label={t("estimate.cacheHits")}
+              value={<>{agg.cacheHits}<span style={{ fontSize: 15, color: "var(--pp-ink-faint)" }}>/{agg.uniqueStrings}</span></>}
+              sub={t("estimate.cacheSub")}
+              bar={cacheHitPct}
+            />
+            <Cell
+              label={t("estimate.tokens")}
+              value={<span style={{ fontSize: 19 }}>{agg.tokensIn} <span style={{ fontSize: 12, color: "var(--pp-ink-faint)" }}>{t("estimate.in")}</span> / {agg.tokensOut} <span style={{ fontSize: 12, color: "var(--pp-ink-faint)" }}>{t("estimate.out")}</span></span>}
+              sub={modelLabel}
+            />
+            <Cell label={t("estimate.cost")} value={costText} sub={t("estimate.costSub")} valueColor="var(--pp-register-ink)" />
+          </SimpleGrid>
 
-      <Text size="xs" c="dimmed" mt={14}>
-        {t("estimate.note")}
-      </Text>
+          {scanCount > 0 && (
+            <Text size="xs" c="dimmed" mt={14}>
+              {t(scanCount === 1 ? "estimate.scanExcludedSingular" : "estimate.scanExcluded", { n: scanCount })}
+            </Text>
+          )}
+
+          <Text size="xs" c="dimmed" mt={14}>
+            {t("estimate.note")}
+          </Text>
+        </>
+      )}
 
       <Group mt={28} gap={10}>
         <Button variant="default" onClick={() => goto("queue")}>

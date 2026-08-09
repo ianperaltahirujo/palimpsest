@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Alert, Badge, Button, Group, Stack, Text, Title } from "@mantine/core";
 import { IconAlertTriangle, IconX } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
@@ -24,6 +25,15 @@ export default function Queue() {
   const { goto, uploads, removeUpload, runEstimate } = useAppState();
   const t = useT();
 
+  // First loading state in this app -- the pattern for the rest. POST
+  // /api/estimate is genuinely slow (server-side it is one count_tokens
+  // round trip per unique paragraph, serially), so the button has to say
+  // something. Mantine's `loading` also sets the real disabled attribute
+  // (Button.mjs: disabled || loading), which already blocks a second
+  // click; the explicit early return covers a synchronous re-entry that
+  // beats the re-render, e.g. a held Enter key.
+  const [estimating, setEstimating] = useState(false);
+
   // MOCK mode keeps its own static fixture list; real mode reads from
   // the uploads the Overview/Sample dropzones actually sent to the
   // server (see state.jsx's addUploads). Shapes are made to line up
@@ -42,11 +52,20 @@ export default function Queue() {
       goto("estimate");
       return;
     }
+    if (estimating) return;
+    setEstimating(true);
     try {
       await runEstimate();
       goto("estimate");
     } catch (e) {
       notifications.show({ message: e.message, color: "flag" });
+    } finally {
+      // goto() above unmounts Queue on success, so this fires on an
+      // unmounted component in the happy path -- a deliberate no-op
+      // (React 18 dropped the "can't update unmounted component"
+      // warning). Resetting in `finally` rather than only in `catch` is
+      // what makes the button recoverable if `goto` itself ever throws.
+      setEstimating(false);
     }
   }
 
@@ -73,7 +92,7 @@ export default function Queue() {
                 {f.name}
               </Text>
               <Group gap={10} mt={3}>
-                <Badge size="xs" variant="light" color={f.kind === "scan" ? "flag" : "ok"} radius="sm">
+                <Badge size="xs" variant="light" color={f.kind === "scan" ? "warn" : "ok"} radius="sm">
                   {t(`queue.kind.${f.kind}`)}
                 </Badge>
                 <Text size="xs" ff="monospace" c="dimmed">
@@ -98,7 +117,7 @@ export default function Queue() {
       </Stack>
 
       {hasScan && (
-        <Alert icon={<IconAlertTriangle size={16} />} color="flag" mt={14} variant="light">
+        <Alert icon={<IconAlertTriangle size={16} />} color="warn" mt={14} variant="light">
           <Text size="sm">
             <T k="queue.scanAlert" params={{ name: scanFile?.name }} />
           </Text>
@@ -106,10 +125,10 @@ export default function Queue() {
       )}
 
       <Group mt={28} gap={10}>
-        <Button variant="default" onClick={() => goto("sample")}>
+        <Button variant="default" onClick={() => goto("sample")} disabled={estimating}>
           {t("common.back")}
         </Button>
-        <Button onClick={handleNext} disabled={files.length === 0}>
+        <Button onClick={handleNext} loading={estimating} disabled={files.length === 0}>
           {t("queue.cta")}
         </Button>
       </Group>

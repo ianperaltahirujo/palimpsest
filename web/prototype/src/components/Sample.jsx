@@ -5,6 +5,7 @@ import PageWipe from "./PageWipe.jsx";
 import { useAppState } from "../state.jsx";
 import { useT } from "../i18n.jsx";
 import { MOCK } from "../config.js";
+import { UPLOAD_ACCEPT } from "../accept.js";
 
 export default function Sample() {
   const { goto, addUploads } = useAppState();
@@ -51,7 +52,7 @@ export default function Sample() {
         {t("sample.caption")}
       </Text>
 
-      <Dropzone onDrop={handleFiles} mt={26} accept={[".pdf", ".docx", ".pptx", ".xlsx"]}>
+      <Dropzone onDrop={handleFiles} mt={26} accept={UPLOAD_ACCEPT} variant="filled" rejectColor="flag">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <Text fw={700} size="sm">

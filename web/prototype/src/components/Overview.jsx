@@ -4,6 +4,7 @@ import { notifications } from "@mantine/notifications";
 import { useAppState } from "../state.jsx";
 import { T, useT } from "../i18n.jsx";
 import { MOCK } from "../config.js";
+import { UPLOAD_ACCEPT } from "../accept.js";
 
 const STEP_KEYS = ["overview.step1", "overview.step2", "overview.step3"];
 
@@ -65,8 +66,8 @@ export default function Overview() {
         {t("overview.cta")}
       </Button>
 
-      <Dropzone onDrop={handleDrop} mt={40} accept={[".pdf", ".docx", ".pptx", ".xlsx"]}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+      <Dropzone onDrop={handleDrop} mt={40} p={28} accept={UPLOAD_ACCEPT} variant="filled" rejectColor="flag">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", minHeight: 76 }}>
           <div>
             <Text fw={700} size="sm">
               {t("overview.dropTitle")}

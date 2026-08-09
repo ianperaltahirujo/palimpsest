@@ -100,7 +100,7 @@ export const STRINGS = {
     "overview.step2": "**Name what must survive verbatim.** Company names, people, places -- added once, protected everywhere.",
     "overview.step3": "**Drop a file.** PDF, Word, PowerPoint, or Excel -- you get back a replica, plus an honest report of anything that didn't translate.",
     "overview.cta": "See a sample →",
-    "overview.dropTitle": "Or drop a file here to start now",
+    "overview.dropTitle": "Drop a file here to start now",
     "overview.dropExts": ".pdf · .docx · .pptx · .xlsx",
 
     "sample.caption": "drag, or use ← → -- Aurora Plaza Trust, sample deed, 1 of 1",
@@ -133,6 +133,9 @@ export const STRINGS = {
     "estimate.costSub": "estimated, not exact",
     "estimate.costUnknown": "unknown",
     "estimate.note": "Cost shown as unknown, not $0.00, whenever the backend can't price the request -- Google Translate is free by design, not free by omission.",
+    "estimate.allScansBody": "**Every file here is a scan.** There's no text layer to count yet, and the OCR pass that creates one runs during translation, not at this step. Paragraphs, tokens, and cost all stay unknown until then -- translation itself works fine, the numbers just can't be known in advance.",
+    "estimate.scanExcluded": "{n} scanned files aren't counted above -- they have no text layer until OCR runs during translation.",
+    "estimate.scanExcludedSingular": "{n} scanned file isn't counted above -- it has no text layer until OCR runs during translation.",
     "estimate.cta": "Translate {n} documents →",
     "estimate.ctaSingular": "Translate {n} document →",
 
@@ -303,7 +306,7 @@ export const STRINGS = {
     "overview.step2": "**Nombra lo que debe permanecer intacto.** Nombres de empresas, personas, lugares -- se agregan una vez y quedan protegidos en todas partes.",
     "overview.step3": "**Suelta un archivo.** PDF, Word, PowerPoint o Excel -- obtienes una réplica, más un informe honesto de todo lo que no se tradujo.",
     "overview.cta": "Ver una muestra →",
-    "overview.dropTitle": "O suelta un archivo aquí para empezar ahora",
+    "overview.dropTitle": "Suelta un archivo aquí para empezar ahora",
     "overview.dropExts": ".pdf · .docx · .pptx · .xlsx",
 
     "sample.caption": "arrastra, o usa ← → -- Fideicomiso Aurora Plaza, escritura de muestra, 1 de 1",
@@ -336,6 +339,9 @@ export const STRINGS = {
     "estimate.costSub": "estimado, no exacto",
     "estimate.costUnknown": "desconocido",
     "estimate.note": "El costo se muestra como desconocido, no $0.00, cuando el backend no puede calcular el precio de la solicitud -- Google Translate es gratis por diseño, no gratis por omisión.",
+    "estimate.allScansBody": "**Todos los archivos aquí son escaneos.** Todavía no hay capa de texto que contar, y el paso de OCR que la crea se ejecuta durante la traducción, no en este paso. Los párrafos, los tokens y el costo quedan como desconocidos hasta entonces -- la traducción funciona igual, solo que los números no se pueden saber de antemano.",
+    "estimate.scanExcluded": "{n} archivos escaneados no están incluidos arriba -- no tienen capa de texto hasta que el OCR se ejecute durante la traducción.",
+    "estimate.scanExcludedSingular": "{n} archivo escaneado no está incluido arriba -- no tiene capa de texto hasta que el OCR se ejecute durante la traducción.",
     "estimate.cta": "Traducir {n} documentos →",
     "estimate.ctaSingular": "Traducir {n} documento →",
 
