@@ -109,9 +109,13 @@ export async function uploadFile(file, onProgress) {
 
 // `targets` maps file_id -> "en" | "es", the language each file is
 // translated INTO. A file with no entry is translated into English.
-export function estimate(fileIds, targets = {}) {
+// `backend`, when set, is the sidebar's pick -- same override createJob
+// already sends; without it estimate() always used the server default.
+export function estimate(fileIds, targets = {}, { backend } = {}) {
+  const body = { file_ids: fileIds, targets };
+  if (backend) body.backend = backend;
   return requestJson("/api/estimate", {
-    method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ file_ids: fileIds, targets }),
+    method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body),
   });
 }
 

@@ -131,6 +131,6 @@ describe("per-file target language", () => {
     await waitFor(() => expect(spanish).toBeChecked());
 
     fireEvent.click(screen.getByRole("button", { name: /estimate cost/i }));
-    await waitFor(() => expect(api.estimate).toHaveBeenCalledWith(["f1"], { f1: "es" }));
+    await waitFor(() => expect(api.estimate).toHaveBeenCalledWith(["f1"], { f1: "es" }, { backend: "gemini" }));
   });
 });

@@ -91,6 +91,7 @@ export const theme = createTheme({
 // BackendSelector.jsx and nowhere else in the app.
 export const VENDOR_COLORS = {
   gemini: "linear-gradient(135deg, #4796E3, #9177C7)",
+  translatepy: "#2fdaa5",
   anthropic: "#D97757",
   google: "#4285F4",
 };

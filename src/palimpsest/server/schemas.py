@@ -40,6 +40,10 @@ class EstimateRequest(BaseModel):
     # A file with no entry is translated into English, the original
     # behaviour. See translate.direction.
     targets: dict[str, str] = {}
+    # Which backend estimates with -- the sidebar's pick. Same override
+    # POST /api/jobs already accepts; without it estimate() always used
+    # the server config's backend even when the user picked another one.
+    backend: str | None = None
 
 
 class DocumentEstimateResponse(BaseModel):

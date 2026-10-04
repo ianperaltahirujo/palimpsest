@@ -248,7 +248,12 @@ def _validate_targets(targets: dict[str, str]) -> None:
 def estimate(request: Request, body: EstimateRequest) -> list[DocumentEstimateResponse]:
     state = _state(request)
     visitor_id = _visitor_id(request)
-    backend = _backend_for_visitor(state, request)
+    config = state.config
+    if body.backend and body.backend != config.backend.name:
+        config = dataclasses.replace(
+            config, backend=dataclasses.replace(config.backend, name=body.backend)
+        )
+    backend = _backend_for_visitor(state, request, config)
     _validate_targets(body.targets)
     results = []
     for file_id in body.file_ids:

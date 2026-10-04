@@ -140,6 +140,20 @@ describe("success path", () => {
     expect(JSON.parse(options.body)).toEqual({ file_ids: ["a", "b"], targets: { b: "es" } });
   });
 
+  it("estimate() includes the backend only when one is selected", async () => {
+    mockFetchOnce(jsonResponse([]));
+    await estimate(["a"], {}, { backend: "gemini" });
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual(
+      { file_ids: ["a"], targets: {}, backend: "gemini" },
+    );
+
+    mockFetchOnce(jsonResponse([]));
+    await estimate(["a"], {});
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual(
+      { file_ids: ["a"], targets: {} },
+    );
+  });
+
   it("cancelJob POSTs to /api/jobs/{id}/cancel with no body", async () => {
     mockFetchOnce(jsonResponse({ id: "job1", status: "cancelled" }));
     await cancelJob("job1");

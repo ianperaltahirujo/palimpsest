@@ -162,8 +162,24 @@ describe("real-mode upload/job state", () => {
       await result.current.startJob({ dual: true });
     });
 
-    expect(api.estimate).toHaveBeenCalledWith(["f1"], { f1: "es" });
-    expect(api.createJob).toHaveBeenCalledWith(["f1"], { backend: null, targets: { f1: "es" }, dual: true });
+    expect(api.estimate).toHaveBeenCalledWith(["f1"], { f1: "es" }, { backend: "gemini" });
+    expect(api.createJob).toHaveBeenCalledWith(["f1"], { backend: "gemini", targets: { f1: "es" }, dual: true });
+  });
+
+  it("runEstimate sends the selected backend through to estimate()", async () => {
+    api.uploadFile.mockResolvedValue({ file_id: "f1", name: "a.pdf", kind: "digital", pages: 1, size: 100 });
+    api.estimate.mockResolvedValue([]);
+    const { result } = renderAppState();
+
+    await act(async () => {
+      await result.current.addUploads([{ name: "a.pdf" }]);
+    });
+    act(() => result.current.setSelectedBackend("anthropic"));
+    await act(async () => {
+      await result.current.runEstimate();
+    });
+
+    expect(api.estimate).toHaveBeenCalledWith(["f1"], {}, { backend: "anthropic" });
   });
 
   it("removing an upload forgets its target", async () => {

@@ -144,6 +144,7 @@ export const STRINGS = {
     "backend.serverAddressChange": "change",
     "backend.serverAddressSave": "Save",
     "backend.sub.gemini": "Free tier - needs a free API key",
+    "backend.sub.translatepy": "Free - no key - offline-friendly fallback",
     "backend.sub.anthropic": "Paid - best quality on legal & financial prose",
     "backend.sub.google": "Free - no key - no entity or glossary awareness",
 
@@ -422,6 +423,7 @@ export const STRINGS = {
     "backend.serverAddressChange": "cambiar",
     "backend.serverAddressSave": "Guardar",
     "backend.sub.gemini": "Nivel gratuito - requiere una clave de API gratuita",
+    "backend.sub.translatepy": "Gratis - sin clave - alternativa sin conexión",
     "backend.sub.anthropic": "De pago - mejor calidad en prosa legal y financiera",
     "backend.sub.google": "Gratis - sin clave - sin reconocimiento de entidades ni glosario",
 

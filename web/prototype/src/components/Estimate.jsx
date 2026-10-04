@@ -49,7 +49,7 @@ export default function Estimate() {
   // health is lifted into AppStateProvider (state.jsx) -- probed once
   // there and shared with BackendSelector.jsx and the app-level
   // unreachable banner, rather than each fetching its own.
-  const { goto, uploads, estimates, startJob, health } = useAppState();
+  const { goto, uploads, estimates, startJob, health, selectedBackend } = useAppState();
   const t = useT();
 
   const agg = MOCK
@@ -59,7 +59,7 @@ export default function Estimate() {
       }
     : aggregate(estimates);
   const costText = MOCK ? ESTIMATE.cost : agg.usd != null ? `~$${agg.usd.toFixed(2)}` : t("estimate.costUnknown");
-  const modelLabel = MOCK ? ESTIMATE.model : health?.backend ?? "";
+  const modelLabel = MOCK ? ESTIMATE.model : (selectedBackend || health?.backend) ?? "";
   const cacheHitPct = agg.uniqueStrings ? (100 * agg.cacheHits) / agg.uniqueStrings : 0;
   const docCount = MOCK ? 2 : uploads.length;
 

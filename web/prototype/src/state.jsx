@@ -34,7 +34,7 @@ export function AppStateProvider({ children }) {
   const [jobId, setJobId] = useState(null);
   const [job, setJob] = useState(null); // latest GET /api/jobs/{id} snapshot
   const [apiError, setApiError] = useState(null); // ApiError | null -- drives the "backend unreachable" banner
-  const [selectedBackend, setSelectedBackend] = useState(null); // null = server's configured default
+  const [selectedBackend, setSelectedBackend] = useState("gemini"); // gemini first: free tier default
 
   // Lifted out of BackendSelector.jsx/Estimate.jsx (each used to probe
   // /api/health independently) so there's exactly one probe, consumed by
@@ -130,14 +130,16 @@ export function AppStateProvider({ children }) {
   const runEstimate = useCallback(async () => {
     setApiError(null);
     try {
-      const result = await api.estimate(uploads.map((u) => u.file_id), targets);
+      const result = await api.estimate(uploads.map((u) => u.file_id), targets, {
+        backend: selectedBackend,
+      });
       setEstimates(result);
       return result;
     } catch (e) {
       setApiError(e);
       throw e;
     }
-  }, [uploads, targets]);
+  }, [uploads, targets, selectedBackend]);
 
   const startJob = useCallback(
     async (opts) => {
@@ -214,6 +216,7 @@ export function useAppState() {
 // mock fixture, just declared here alongside the others.
 export const BACKEND_COPY = {
   gemini: { label: "gemini", needsKey: true },
+  translatepy: { label: "free fallback", needsKey: false },
   anthropic: { label: "claude", needsKey: true },
   google: { label: "google machine translation", needsKey: false },
 };

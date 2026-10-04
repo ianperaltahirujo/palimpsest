@@ -313,6 +313,32 @@ def test_estimate_returns_document_numbers(client):
     assert est["cache_hits"] == 0  # fresh cache, nothing warmed yet
 
 
+def test_estimate_honors_requested_backend_override(tmp_path):
+    """POST /api/estimate accepts the same `backend` override POST
+    /api/jobs does -- without it the estimate always used the server
+    config's backend even when the UI had another one selected."""
+    from palimpsest.config.model import BackendConfig
+
+    seen: dict = {}
+
+    def _recording_factory(config, **_kwargs):
+        seen["name"] = config.backend.name
+        return FakeBackend(
+            translate_fn=lambda s: s.upper(), uses_placeholder_protection=False
+        )
+
+    config = _config(tmp_path)
+    config = Config(
+        paths=config.paths, thresholds=config.thresholds, fonts=config.fonts,
+        backend=BackendConfig(name="google", fallback=None),
+    )
+    app = create_app(config, backend_factory=_recording_factory)
+    with TestClient(app) as c:
+        resp = c.post("/api/estimate", json={"file_ids": [], "backend": "google"})
+    assert resp.status_code == 200
+    assert seen["name"] == "google"
+
+
 # -- jobs: create, progress, download ------------------------------------
 
 
