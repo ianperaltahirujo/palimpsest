@@ -88,6 +88,9 @@ not run backwards, and is dropped (not inverted) for an English source:
   language-neutral list marker (`a)`, `2.`) is peeled.
 - **OCR.** A scanned English document is OCR'd with Tesseract's `eng`
   pack (a Spanish source keeps the configured `[ocr].language`).
+- **Command line.** `palimpsest translate --target es` applies the same
+  direction rules to one file; `palimpsest batch` still uses the
+  `[language]` pair from the config for every document.
 - **Report wording.** The Results screen's labels still read "Kept
   Spanish" for any untranslated paragraph, whichever the source language.
 

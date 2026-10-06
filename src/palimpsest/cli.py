@@ -33,6 +33,7 @@ from palimpsest.text.glossary import Glossary
 from palimpsest.text.protect import EntityGuard
 from palimpsest.translate.backend import TranslationContext
 from palimpsest.translate.cache import Cache, compute_namespace
+from palimpsest.translate.direction import SUPPORTED_TARGETS, config_for_target, resources_for
 from palimpsest.translate.estimate import estimate_document, format_document_estimate
 from palimpsest.translate.registry import make_backend
 from palimpsest.translate.translator import Translator
@@ -175,6 +176,13 @@ def _dry_run_office(
 
 def cmd_translate(args: argparse.Namespace) -> int:
     config, entities, glossary, documents, post_rules = load_context(args.config)
+    if args.target:
+        # Same per-document direction switch the web UI's Queue step uses:
+        # the language pair and OCR pack follow the target, and the
+        # Spanish -> English-only glossary and post-rules are dropped for
+        # English -> Spanish (see translate.direction).
+        config = config_for_target(config, args.target)
+        glossary, post_rules = resources_for(args.target, glossary, post_rules)
     input_path = Path(args.input)
     if not input_path.is_file():
         print(f"error: no such file: {input_path}", file=sys.stderr)
@@ -459,6 +467,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_translate.add_argument("-o", "--output")
     p_translate.add_argument("--pages", help="e.g. 1-5,11 (PDF only)")
     p_translate.add_argument("--backend", help="override [backend].name for this run")
+    p_translate.add_argument(
+        "--target", choices=SUPPORTED_TARGETS,
+        help="language to translate INTO (en or es); the source is the other one. "
+        "Default: the [language] pair from palimpsest.toml (es -> en)",
+    )
     p_translate.add_argument("--dual", action="store_true", help="also write a bilingual PDF")
     p_translate.add_argument("--dry-run", action="store_true")
     p_translate.add_argument("--debug-boxes", action="store_true")

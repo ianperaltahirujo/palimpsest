@@ -68,6 +68,7 @@ palimpsest translate deed.pdf                    # -> deed.en.pdf, Gemini backen
 palimpsest translate deed.pdf --backend anthropic # needs ANTHROPIC_API_KEY in the environment
 palimpsest translate deed.pdf --backend google    # Google Translate, no key at all
 palimpsest translate deed.pdf --dry-run           # classify, count paragraphs, estimate cost -- no translation
+palimpsest translate contract.docx --target es    # English -> Spanish (the default direction is Spanish -> English)
 ```
 
 That's it for a single file — no config required. `palimpsest translate`
