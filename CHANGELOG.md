@@ -17,6 +17,10 @@ compatibility guarantees (pre-1.0).
   its `target`. Downloads are now named `<source name>.<lang>.<ext>`.
   See `docs/design/limitations.md` for what English -> Spanish does not
   get (glossaries, date fixups, ordinals).
+- `palimpsest translate --target en|es` picks the language a single file is
+  translated into from the command line, the same per-file direction switch
+  the web UI's Queue step has (default: the `[language]` pair in the config).
+  The output is named `<name>.<target>.<ext>`.
 - A setup guide page, a home-page help link, and a Back button on the
   Sample screen.
 

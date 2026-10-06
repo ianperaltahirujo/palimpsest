@@ -400,3 +400,55 @@ def test_main_dotenv_never_overrides_real_env(tmp_path, monkeypatch):
     (tmp_path / ".env").write_text("PALIMPSEST_TEST_DOTENV_VAR=from-dotenv\n", encoding="utf-8")
     cli.main(["config", "init"])
     assert os.environ["PALIMPSEST_TEST_DOTENV_VAR"] == "from-shell"
+
+
+# -- --target ---------------------------------------------------------------
+
+
+def _capture_translate_args(monkeypatch):
+    seen = {}
+    real = cli.translate_pdf_document
+
+    def spy(src, out, rel, backend, entities, glossary, post_rules, config, **kw):
+        seen.update(glossary=glossary, post_rules=post_rules, config=config)
+        return real(src, out, rel, backend, entities, glossary, post_rules, config, **kw)
+
+    monkeypatch.setattr(cli, "translate_pdf_document", spy)
+    return seen
+
+
+def test_translate_target_es_reverses_direction_and_names_the_output(tmp_path, monkeypatch):
+    from palimpsest.text.glossary import Glossary
+
+    monkeypatch.setattr(
+        cli, "load_context",
+        lambda arg: (
+            _config(tmp_path), (), Glossary({"sociedad": "company"}), DocumentMap(), (("a", "b"),)
+        ),
+    )
+    seen = _capture_translate_args(monkeypatch)
+    src = tmp_path / "english.pdf"
+    _pdf(src, "This is a test paragraph with enough text to be classified as digital.")
+    rc = cli.main(["translate", str(src), "--target", "es"])
+    assert rc == 0
+    assert (tmp_path / "english.es.pdf").exists()
+    assert (seen["config"].language.source, seen["config"].language.target) == ("en", "es")
+    # The es -> en glossary and post-rules are dropped, not applied backwards.
+    assert seen["glossary"].terms == {} and seen["post_rules"] == ()
+
+
+def test_translate_without_target_keeps_the_configured_direction(tmp_path, monkeypatch):
+    _patch_context(monkeypatch, _config(tmp_path))
+    seen = _capture_translate_args(monkeypatch)
+    src = tmp_path / "in.pdf"
+    _pdf(src)
+    assert cli.main(["translate", str(src)]) == 0
+    assert (tmp_path / "in.en.pdf").exists()
+    assert (seen["config"].language.source, seen["config"].language.target) == ("es", "en")
+
+
+def test_translate_rejects_an_unsupported_target(tmp_path, monkeypatch, capsys):
+    _patch_context(monkeypatch, _config(tmp_path))
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["translate", "x.pdf", "--target", "fr"])
+    assert exc.value.code == 2
